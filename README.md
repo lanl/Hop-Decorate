@@ -11,6 +11,7 @@ High throughput molecular dynamics workflow for generating atomistic databases o
     - [Requirements](#requirements)
   - [Bug Reports and Discussions](#bug-reports-and-discussions)
   - [Code limitations](#code-limitations)
+  - [License & Copyright](#license--copyright)
 
 ## Description
 
