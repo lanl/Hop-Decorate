@@ -149,7 +149,7 @@ class Model:
     def workDistribution(self, size):
         inverseTimes = 1 / np.array([ s.time for s in self.stateList ])
         # TODO: account for different model depth requirements.
-        if self.params.maxModelDepth > 0: inverseTimes[1:] = 0
+        if self.params.maxModelDepth >= 0: inverseTimes[1:] = 0
         return np.random.choice(self.stateList, p = inverseTimes  / inverseTimes .sum(), size = size)
 
 def checkpoint(model, filename = 'model-checkpoint_latest.pkl'):
