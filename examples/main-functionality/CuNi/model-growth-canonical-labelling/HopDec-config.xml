@@ -2,13 +2,36 @@
 
 <!--
 ===================================
-LAMMPS SETTINGS
+MAIN SETTINGS
 ===================================
 -->
 
 <!-- initial configuration  -->
-<inputFilename>input/IV1.dat</inputFilename>
+<inputFilename>input/2V_Minimized.dat</inputFilename>
 <inputDirectory>input/</inputDirectory>
+
+<!-- 0(False)/1(True) for verbose output -->
+<verbose> 1 </verbose>
+
+<!-- controls how much we should grow the model. -1 = no limit, 0 = only run MD in initial state. -->
+<!-- No other values are currently implemented. -->
+<maxModelDepth> -1 </maxModelDepth>
+
+<!-- step intervals of checkpoint files -->
+<checkpointInterval> 100 </checkpointInterval>
+
+<!-- 1 = use canonical labelling for model growth, 0 = opposite -->
+<canonicalLabelling> 1 </canonicalLabelling>
+
+<!-- Redecorate discovered transition? 0 = No, 1 = Yes -->
+<!-- Redecoration settings can be found below -->
+<redecorateTransitions> 1 </redecorateTransitions>
+
+<!--
+===================================
+LAMMPS SETTINGS
+===================================
+-->
 
 <!-- Boilerplate lammps script. 
 If working with a charged system use the 'set' command in this block -->
@@ -19,8 +42,7 @@ pair_style eam
 pair_coeff 1 1 input/Cu_smf7.eam
 pair_coeff 2 2 input/Ni_smf7.eam
 </LAMMPSInitScript>
-<!-- set LAMMPS atom style -->
-<atomStyle>atomic</atomStyle>
+
 <!-- Number of atomic species in the simulation -->
 <NSpecies>2</NSpecies>
 <!-- Comma seperated list of Specie Names, Order must be the same as in LAMMPSInitScript 
@@ -28,7 +50,7 @@ Must include ALL species -->
 <specieNamesString>Cu,Ni</specieNamesString>
 
 <!-- Temperature at which the event discovery is discovered -->
-<MDTemperature>800.0</MDTemperature>
+<MDTemperature>1200.0</MDTemperature>
 <!-- Timestep for MD runs -->
 <MDTimestep>0.001</MDTimestep>
 <!-- MD time per segment (ps) before checking for an event -->
@@ -43,12 +65,11 @@ DEFECT IDENTIFICATION SETTINGS
 -->
 
 <!-- Centrosymmetry N nearest neighbor setting -->
-<centroN>8</centroN>
+<centroN>12</centroN>
 <!-- Centrosymmetry cutoff for defect volume identification -->
 <centroCutoff>1</centroCutoff>
 <!-- Maximum distance between two atoms (overestimate slightly) -->
 <bondCutoff>2.70</bondCutoff>
-
 
 <!--
 ===================================
@@ -63,10 +84,12 @@ REDECORATION SETTINGS
 <!-- Comma seperated list of concentrations, Order must be the same as in specieNamesString -->
 <concentrationString>0.5,0.5</concentrationString>
 <!-- Number of decorations to do for each transition -->
-<nDecorations> 10 </nDecorations>
+<nDecorations> 8 </nDecorations>
 <!-- Integer random seed for the redecoration process. -->
 <!-- WARNING: Redecorations will be identical if this value is unchanged-->
 <randomSeed>1234</randomSeed>
+<!-- do you want to pickle the redecoration info straight to file? 0 = No, 1 = Yes -->
+<pickleRedecorations> 0 </pickleRedecorations>
 
 <!--
 ===================================
@@ -75,7 +98,7 @@ MINIMIZATION SETTINGS
 -->
 
 <!-- Usual LAMMPS Min settings -->
-<minimizationForceTolerance>1e-5</minimizationForceTolerance>
+<minimizationForceTolerance>1e-20</minimizationForceTolerance>
 <minimizationEnergyTolerance>0.0</minimizationEnergyTolerance>
 <minimizationMaxSteps>10000</minimizationMaxSteps>
 <!--  -->
@@ -89,20 +112,21 @@ NEB SETTINGS
 ===================================
 -->
 
+<!-- break symmetry with a few steps of MD before a NEB simulation is run -->
+<!-- sometimes the neb can be initialized with a highly symmetric linear interpolation
+this can give strange NEB results where two (uncorrelated) atoms move at the same time. 
+If you experience this then turn this setting ON (1)-->
+<breakSym></breakSym>
+
 <!-- NEB knots -->
 <NEBNodes> 11 </NEBNodes>
-<NEBClimbingImage>0</NEBClimbingImage>
+<NEBClimbingImage> 0 </NEBClimbingImage>
 <!-- NEB spring constant, in [F]/[X] MD units  -->
 <NEBSpringConstant> 1 </NEBSpringConstant> 
 <!-- Maximum element of force vector in MD units -->
-<NEBForceTolerance> 0.1 </NEBForceTolerance>
+<NEBForceTolerance> 0.01 </NEBForceTolerance>
 <!-- Maximum number of force calls -->
-<NEBMaxIterations> 100 </NEBMaxIterations>
-<!-- <NEBTimestep> 0.002 </NEBTimestep> -->
-<NEBmaxBarrier>100</NEBmaxBarrier>
-<!-- Check for intermediate minimia in NEB calculation. -->
-<NEBCheckIntermediateMinima> 0 </NEBCheckIntermediateMinima>
-<maxNEBsToDo>100</maxNEBsToDo>
+<NEBMaxIterations> 1000 </NEBMaxIterations>
 
 <!--
 ===================================

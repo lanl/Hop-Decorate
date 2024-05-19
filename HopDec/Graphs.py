@@ -1,40 +1,54 @@
 import networkx as nx
 import numpy as np
 
-def canLabelFromGraph(graphEdges, types):
+def graphLabel(graphEdges, canonical = 1, types = None, indices = None):
 
-    """
-    Compute the canonical label from the graph representation using the Weisfeiler-Lehman Algorithm.
-
-    Parameters:
-    graph_edges (list): List of edges in the graph.
-    types (numpy.ndarray): Array of node types.
-
-    Returns:
-    str: The canonical label of the graph.
-    """
 
     G = nx.Graph([list(row) for row in graphEdges])
 
-    # coloring
-    if types is not None:
-        nx.set_node_attributes(G, np.array(types), "types")
-        L = nx.algorithms.graph_hashing.weisfeiler_lehman_graph_hash(G, node_attr = "types")
+    if not canonical:
+        if indices is None:
+            ValueError('Non-canonical labeling requires indices to be set.')
+
+        nx.set_node_attributes(G, np.array(indices), "IDs")
+        L = nx.algorithms.graph_hashing.weisfeiler_lehman_graph_hash(G, node_attr = "IDs")
+
     else:
-        L = nx.algorithms.graph_hashing.weisfeiler_lehman_graph_hash(G)
+        if types is None:
+            L = nx.algorithms.graph_hashing.weisfeiler_lehman_graph_hash(G)
 
-    # Compute the canonical label using the Weisfeiler-Lehman Algorithm.
+        else:
+            nx.set_node_attributes(G, np.array(types), "types")
+            L = nx.algorithms.graph_hashing.weisfeiler_lehman_graph_hash(G, node_attr = "types")
+
     return L
 
 
-def nonCanLabelFromGraph(graphEdges, defectIndices):
+def nDefectVolumes(graphEdges):
 
-    G = nx.Graph([list(row) for row in graphEdges])
+    def dfs(graph, start, visited):
+        visited[start] = True
+        for neighbor in graph[start]:
+            if not visited[neighbor]:
+                dfs(graph, neighbor, visited)
 
-    # coloring
-    nx.set_node_attributes(G, np.array(defectIndices), "IDs")
+    def check_reachability(graph):
+        num_nodes = len(graph)
+        for start_node in range(num_nodes):
+            visited = [False] * num_nodes
+            dfs(graph, start_node, visited)
+            if not all(visited):
+                return False
+        return True
 
-    # Compute the canonical label using the Weisfeiler-Lehman Algorithm.
-    L = nx.algorithms.graph_hashing.weisfeiler_lehman_graph_hash(G, node_attr = "IDs")
-    
-    return L
+    num_nodes = max(max(edge) for edge in graphEdges) + 1
+    graph = [[] for _ in range(num_nodes)]
+
+    for edge in graphEdges:
+        graph[edge[0]].append(edge[1])
+        graph[edge[1]].append(edge[0])
+
+    if check_reachability(graph):
+        return 1
+    else:
+        return 2

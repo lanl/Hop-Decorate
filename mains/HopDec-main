@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+
+from HopDec.Input import getParams
+from HopDec.State import *
+from HopDec.Model import *
+from HopDec.Utilities import log
+import HopDec.Redecorate as Redecorate
+import HopDec.NEB as NEB
+import HopDec.MD as MD
+
+import pickle
+
+def main(baseComm, params):
+
+    # TODO: - Need to update config files with new options
+    #       - maxModelDepth parameter could be used to control how many transitions away from initial we want to run MD.
+    #       - Need a way to test if the transition has been seen before BEFORE doing the NEB. This is hard because the ranks own the transitions but not the model...
+
+    from mpi4py import MPI
+
+    ### Comm Setup ###
+    rank = baseComm.Get_rank()
+    size = baseComm.Get_size()
+    color = rank
+    comm = baseComm.Split(color = color, key = rank)
+
+    baseComm.barrier()
+    
+    if rank == 0: 
+        
+        printConsoleHeader()
+
+        # load/initalize the model
+        if os.path.exists('model-checkpoint_latest.pkl'):
+            with open('model-checkpoint_latest.pkl', 'rb') as f:
+                model = pickle.load(f)
+        else:
+            # setup a model if we aren't given one.
+            model = setupModel(params, comm = comm)
+    
+    else: model = None # only rank 0 gets a model
+
+    k = 0
+    while True: ###### if modelGrowth = 0 then the criteria should just be based on initialState
+
+        if params.redecorateTransitions:
+            
+            _undecoratedTransitions = None
+            if rank == 0: 
+                undecoratedTransitions = model.undecoratedTransitions()
+                _undecoratedTransitions = copy.deepcopy(undecoratedTransitions)
+
+            _undecoratedTransitions = baseComm.bcast(_undecoratedTransitions, root = 0)
+
+            for t,trans in enumerate(_undecoratedTransitions):
+                
+                # run redecoration
+                redecResults = Redecorate.main(trans, params, pickle = params.pickleRedecorations, comm = baseComm)
+                
+                if rank == 0: 
+                    # update model
+                    undecoratedTransitions[t].redecoration = redecResults
+
+                    # write checkpoint file
+                    checkpoint(model)
+                    checkpoint(model, filename = f'model-checkpoint_{len(model)}.pkl')
+
+        baseComm.barrier()
+
+        # generate list of states that need more MD.
+        # if we dont want to grow the model then model.intialState is the only choice
+        if rank == 0:
+
+            workDistribution = model.workDistribution(size)
+            initialState = workDistribution[0]
+            for r in range(1,size):
+                baseComm.send(workDistribution[r], dest = r, tag = 0)
+
+        else:
+
+            initialState = baseComm.recv(source = 0, tag = 0)
+
+        initialState = copy.deepcopy(initialState)
+       
+        # run the MD for 'params.segmentLength' ps at 'params.MDTemperature' K
+        _, finalState, flag = MD.main(initialState, params, comm = comm, maxMDTime = params.segmentLength, rank = rank, verbose = True)
+    
+        # if we hopped, run a neb to generate a connection
+        connection = None
+        if flag:
+            # stop here if the init and fin violate the maz defect thing???
+            log('NEB', f'rank: {rank} Running NEB', 0)
+            connection = NEB.main(initialState, finalState, params, comm = comm)
+
+        # gather all connections to rank 0
+        connections = baseComm.gather(connection, root = 0)
+        
+        if rank == 0:         
+        
+            # update model on rank 0 with connections from each rank
+            status = model.update(workDistribution, connections = connections)
+
+            # if the model was updated
+            if status:
+
+                # write checkpoint files
+                checkpoint(model)
+                checkpoint(model, filename = f'model-checkpoint_{len(model)}.pkl')
+
+            k += 1
+            if k % params.checkpointInterval == 0:
+                checkpoint(model)
+
+        baseComm.barrier()
+    
+    if rank == 0: 
+        
+        printConsoleFooter()
+
+    # clean up
+    MPI.Finalize()
+
+if __name__== "__main__":
+
+    import signal
+    import sys
+
+    def handler(signum, frame):
+        print("Time limit exceeded. Exiting...")
+        # run some clean-up script here...
+        sys.exit()
+    
+    comm = MPI.COMM_WORLD
+    params = getParams()
+
+    # Set up a timer to trigger after params.runTime (seconds)
+    signal.signal(signal.SIGALRM, handler)
+    signal.alarm(params.runTime)
+
+    try:
+        main(comm, params)
+        
+    finally:
+        # Reset the alarm to avoid the handler being called after the script completes
+        signal.alarm(0)
+    

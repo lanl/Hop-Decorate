@@ -1,26 +1,23 @@
-import os
-import sys
-import copy
-import numpy as np
-import tempfile
-import networkx as nx
-import pickle as pic
 
-from .Utilities import *
-from . import Vectors
-from . import Constants
-from .Lammps import LammpsInterface
-from . import Atoms
 from .Graphs import *
 from .Input import *
 from .Transitions import *
 from .ASE import *
+from .Utilities import *
+from . import Vectors
+from . import Constants
+from . import Atoms
+from .Lammps import LammpsInterface
 
-from typing import List
 from ase import Atoms
 from ase.io import read
+from ase.io.lammpsdata import read_lammps_data
 from scipy.spatial.distance import cdist
 
+import sys
+import pickle
+import numpy as np
+from typing import List
 
 ################################################################################
 
@@ -63,17 +60,17 @@ class State:
         self.type = np.empty(self.NAtoms, np.int32)
         self.NSpecies = None        
 
-        self.totalEnergy = 0
+        self.totalEnergy = None
         self.time = 0
-
 
         self.centroSyms = []
         self.defectCOM = []
         self.defectIndices = []
         self.defectPositions = []
+        self.defectTypes = []
+
         self.canLabel = ''
         self.nonCanLabel = ''
-        self.defectTypes = []
 
         self.displacementVector = None
         self.displacementNVector = None
@@ -360,7 +357,7 @@ class State:
                       pbc = [1,1,1])
 
         return atoms
-
+    
     
 def readStateLAMMPSData(filename: str)-> State:
 
@@ -483,7 +480,7 @@ def asePickleToStateList(params : InputParams, filename : str) -> List[State]:
     ase = ASE(params)
 
     with open(filename, 'rb') as file:
-        nebListASE = pic.load(file)
+        nebListASE = pickle.load(file)
 
     for i,atoms in enumerate(nebListASE):
         nebListState.append([ ase.toState(atoms[0]), ase.toState(atoms[1]) ])
@@ -491,9 +488,10 @@ def asePickleToStateList(params : InputParams, filename : str) -> List[State]:
     return nebListState
 
 
-def getStateCanonicalLabel(state : State, params : InputParams, comm = None):
+def getStateCanonicalLabel(state : State, params : InputParams, comm = None, lmp = None):
 
-    lmp = LammpsInterface(params, communicator = comm)
+    if not lmp:
+        lmp = LammpsInterface(params, communicator = comm)
     lmp.calcCentro(state)
 
     indices = np.where( state.centroSyms > params.centroCutoff)
@@ -512,18 +510,19 @@ def getStateCanonicalLabel(state : State, params : InputParams, comm = None):
     state.defectPositions = np.array(defectPos)
 
     # COM
-    state.defectCOM = COM(state.defectPositions, state.cellDims)
+    state.defectCOM = Vectors.COM(state.defectPositions, state.cellDims)
     
     # defect Types
-    T = [ state.type[i-1] for i in indices[0] ]
-    defectTypes = T
+    defectTypes = [ state.type[i-1] for i in indices[0] ]
 
     state.defectTypes = defectTypes
 
-    graphEdges = findConnectivity(state.defectPositions, params.bondCutoff, state.cellDims)
-    
-    state.canLabel = canLabelFromGraph(graphEdges, defectTypes)
-    state.nonCanLabel = nonCanLabelFromGraph(graphEdges, state.defectIndices)
+    graphEdges = Vectors.findConnectivity(state.defectPositions, params.bondCutoff, state.cellDims)
+    state.graphEdges = graphEdges
+    state.nDefects = nDefectVolumes(graphEdges)
+
+    state.canLabel = graphLabel(graphEdges, types = defectTypes, canonical = 1)
+    state.nonCanLabel = graphLabel(graphEdges, indices = state.defectIndices, canonical = 0)
 
 
 if __name__ == '__main__':

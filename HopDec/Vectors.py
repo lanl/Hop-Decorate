@@ -153,7 +153,7 @@ def maxMoveAtomPos(pos1 : list, pos2 :  list, cellDims: list) -> float:
         maxMove = np.max([maxMove, separation(pos1[3*i:3*(i+1)], pos2[3*i:3*(i+1)], cellDims)])
     return maxMove
 
-def COM(pos, cellDims) -> list:
+def _COM(pos, cellDims) -> list:
     """
     Calculate the center of mass of a system of particles within a periodic box.
 
@@ -166,6 +166,7 @@ def COM(pos, cellDims) -> list:
 
     """
     coordinates = [pos[3*p:3*(p+1)] for p in range(len(pos) // 3)]
+    print(coordinates)
     coordinates = np.array(coordinates)
     box_size = np.array([cellDims[0], cellDims[4], cellDims[8]])
 
@@ -182,6 +183,40 @@ def COM(pos, cellDims) -> list:
     center_of_mass /= total_mass
 
     return center_of_mass.tolist()
+
+def COM(points,cellDims):
+    """
+    Calculate the center of mass of a set of 3D points in a periodic simulation box.
+
+    Parameters:
+    - points: numpy array of shape (3*N,) containing the coordinates of N points, where each group of three values represents the x, y, and z coordinates of a point.
+    - box_size: numpy array of shape (3,) containing the dimensions of the simulation box.
+
+    Returns:
+    - com: numpy array of shape (3,) representing the center of mass.
+    """
+    # Reshape points array into (N, 3)
+    points = points.reshape(-1, 3)
+    box_size = np.array([cellDims[0], cellDims[4], cellDims[8]])
+    # Calculate the minimum image distance for periodic boundary conditions
+    def minimum_image_distance(p1, p2, box):
+        deltas = p2 - p1
+        deltas -= np.rint(deltas / box) * box
+        return deltas
+
+    # Wrap points into box
+    wrapped_points = points % box_size
+
+    # Calculate center of mass
+    total_mass = len(points)
+    com = np.sum(wrapped_points, axis=0) / total_mass
+
+    # Adjust center of mass for periodic boundary conditions
+    for i in range(3):
+        axis_points = wrapped_points[:, i]
+        com[i] -= np.floor(np.mean(axis_points) / box_size[i]) * box_size[i]
+
+    return com
 
 def findConnectivity(pos, cutoff, cellDims):
     """

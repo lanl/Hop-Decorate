@@ -1,22 +1,8 @@
-# -*- coding: utf-8 -*-
-
-"""
-Minimisation module.
-
-"""
-import sys
-import copy
-import time
-import math
-
-import numpy as np
-from scipy import optimize
-
 from .Lammps import *
-from .State import readStateLAMMPSData
 from .Input import *
 from .Utilities import *
 from .Vectors import *
+from .State import readStateLAMMPSData, getStateCanonicalLabel, State
 
 ################################################################################
 
@@ -39,8 +25,6 @@ def commandLineArgs():
 ################################################################################
 def mainCMD(comm):
 
-    # from . import State
-    
     # pull command line arguments
     progargs = commandLineArgs()
     
@@ -50,19 +34,21 @@ def mainCMD(comm):
     # read lattice and calculate the forces
     state = readStateLAMMPSData(progargs.inputFile)
 
-    # LAMMPS object
-    lmp = LammpsInterface(params)
-
     # Minimize
-    main(state, lmp, params, dumpMin = progargs.dumpMin, verbose = True)
+    main(state, params, dump = progargs.dumpMin, verbose = True, comm = comm)
     
     # write relaxed state
     state.writeState(progargs.outputFile)
     
-    log(__name__, "Minimized state is stored at: "+ progargs.outputFile, 2)
+    log(__name__, f'Minimized state is stored at: {progargs.outputFile}', 2)
 
-def main(state, lmp : LammpsInterface, params : InputParams, dumpMin = False, verbose = False):
+def main(state : State, params : InputParams, dump = False, verbose = False, comm = None, lmp = None):
 
     # Minimize
-    lmp.minimize(state, dump = dumpMin, verbose = verbose)
+    if not lmp: lmp = LammpsInterface(params, communicator = comm)
+    move = lmp.minimize(state, dump = dump, verbose = verbose)
+    
+    # labelling
+    getStateCanonicalLabel(state, params, comm = comm, lmp = lmp)
 
+    return move

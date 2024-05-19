@@ -5,19 +5,15 @@ from .Utilities import *
 from .Lammps import *
 from .Plots import *
 from .Transitions import *
-from . import Redecorate as Red
+from . import MD as md
+from . import Minimize as min
 
-import ase
-import numpy as np
-import tempfile
-import copy
-
-from ase.io import read, write
-from ase.calculators.lammpslib import LAMMPSlib
-from ase.optimize import MDMin
 from ase.neb import NEB
+from ase.calculators.lammpslib import LAMMPSlib
 from ase.optimize.fire import FIRE as QuasiNewton
-from ase.optimize import BFGS
+
+import copy
+import numpy as np
 
 class ASE_NEB(ASE):
     
@@ -219,17 +215,15 @@ class ASE_NEB(ASE):
         self.findMinimaNodes()
 
         # these indicate something went wrong with the NEB
-        if 0 not in self.minimaNodes or len(self.pathEnergy) - 1 not in self.minimaNodes:
-            self.badEnds = 1
+        # if 0 not in self.minimaNodes or len(self.pathEnergy) - 1 not in self.minimaNodes:
+        #     self.badEnds = 1
 
         if  len(self.saddleNodes) == 0: # or len(self.saddleNodes) != len(self.minimaNodes) - 1:
             self.flag = 1
         
-
-
 ################################################################################
 
-def exportForDebug(init,fin,neb,index):
+def _exportForDebug(init,fin,neb,index):
     
     transition = Transition(init,fin)
     transition.forwardBarrier = neb.forwardBarrier
@@ -252,7 +246,7 @@ def exportForDebug(init,fin,neb,index):
     transition.exportStructure('test', index)
     transition.plot('test', index)
     
-
+################################################################################
 
 def commandLineArgs():
     
@@ -306,11 +300,10 @@ def mainCMD(comm):
     log(__name__,f"Completed {len(connection.transitions)} NEBs!")
 
 
-
 ################################################################################
 
 
-def main(initialState : State, finalState : State, params : InputParams, comm = None, plotPathways = False, exportStructures = False, logNEB = None, verbose = False, pickle = False, directory = './') -> Connection:
+def main(initialState : State, finalState : State, params : InputParams, comm = None, plotPathways = False, exportStructures = False, logNEB = None, verbose = False, directory = './') -> Connection:
     
     """
     The main function to run the NEB calculation.
@@ -331,96 +324,96 @@ def main(initialState : State, finalState : State, params : InputParams, comm = 
 
     """
     
-    maxSaddles = 20
+    # if we find a pathway which has more than maxSaddles we throw it away...
+    maxSaddles = 20 # TODO: User defined
+
+    uniquenessThreshold = 0.3 # TODO: User defined
     
-    # Store NEB results in a connection and return this object - this is a collection of transitions
+    # Store NEB results in a connection which is returned
     connection = Connection(initialState, finalState)
 
-    # add initial NEB todo:
+    # add initial NEB to the queue (nebsTODO)
     nebsTODO = [[initialState,finalState]]
     completedNEBPos = []
 
     # counters
     nebsCompleted = 0
-    nebSuccessful = 0
+    nebsSuccessful = 0
 
     # We loop until there are no NEBs left to do or until one of the NEBs fails/ we have done too many
     while len(nebsTODO) and nebsCompleted < params.maxNEBsToDo:
 
-        # set these as the working neb
-        workingNEB = nebsTODO.pop(0)
-        init = workingNEB[0]
-        fin = workingNEB[1]
+        # take the next neb in the queue (nebsTODO)
+        [init, fin] = nebsTODO.pop(0)
 
         # Minimize end points
-        if verbose:
-            log(__name__,f'Minimizing End Points')
-            
-        lmp = LammpsInterface(params, communicator = comm)
-        minDistInit = lmp.minimize(init, verbose = verbose)
-        del lmp
-
-        lmp = LammpsInterface(params, communicator = comm)
-        minDistFin = lmp.minimize(fin, verbose = verbose)
-        del lmp
+        if verbose: log(__name__,f'Minimizing End Points')
+        minDistInit = min.main(init, params, verbose = verbose)
+        minDistFin = min.main(fin, params, verbose = verbose)
         
         # if the minimization took us far from where we started throw it away.
-        if minDistInit > params.maxMoveMin or minDistFin > params.maxMoveMin:
+        if minDistInit > params.maxMoveMin: 
             if verbose: log(__name__,f"WARNING: Initial or Final structure moved > {params.maxMoveMin}. Skipping...")
             continue
 
-        if maxMoveAtom(init, fin) < 0.3: # TODO: Make this a parameter
+        if minDistFin > params.maxMoveMin:
+            if verbose: log(__name__,f"WARNING: Initial or Final structure moved > {params.maxMoveMin}. Skipping...")
+            continue
+
+        # if the initial structure has hyperdistance within some cutoff we say they are the same structure
+        if maxMoveAtom(init, fin) < uniquenessThreshold:
             if verbose: log(__name__,f"WARNING. Initial and Final Structures are the Same. Skipping...")
             continue
 
+        # generate the labels for the current states. Just for logging
         getStateCanonicalLabel(init, params, comm = comm)
         getStateCanonicalLabel(fin, params, comm = comm)
+
+        # run a few ps of md on init and fin to break sym
+        # TODO: This causes issues so i need to do it a different way.
+        if params.breakSym:
+            _,init,_ = md.main(init, params, maxMDTime=2, T=10, segmentLength=5,comm=comm)
+            _,fin,_ = md.main(fin, params, maxMDTime=2, T=10, segmentLength=5,comm=comm)
 
         # NEB object and run
         neb = ASE_NEB(params, communicator = comm)
         
-        # Embarrasing Hack. Sometimes ase NEB goes wrong for some reason (?)
+        # Embarrasing Hack. Sometimes ASE NEB goes wrong for some reason (?)
         try:
             neb.run(init, fin,
                     logNEB = logNEB, 
                     verbose = verbose)
         except:
             continue
-
-        # check for intermediate minima
-        if verbose: log(__name__,f'Checking NEB path for integrity')
-        neb.checkNEB()
-
+        
         # incremenet neb counter
         nebsCompleted += 1
 
+        if verbose: log(__name__,f'Checking NEB path for integrity')
+        neb.checkNEB()
+
         # check if the NEB did something bad
         if neb.flag:
-            print("ERROR: Something went wrong with your NEB")
+            print("ERROR: No saddle points were found. Skipping...")
             continue
         
         if neb.forwardBarrier > params.NEBmaxBarrier:
-            print(f"ERROR: Found Barrier {neb.forwardBarrier} > Max Barrier {params.NEBmaxBarrier}")
+            print(f"ERROR: Found Barrier {neb.forwardBarrier} > Max Barrier {params.NEBmaxBarrier}. Skipping...")
             continue
         
         if len(neb.saddleNodes) > maxSaddles:
-            print(f"Number of Saddles = {len(neb.saddleNodes)} > {maxSaddles}")
+            print(f"ERROR: Number of Saddles = {len(neb.saddleNodes)} > {maxSaddles}. Skipping...")
             continue
 
-        # If we get this point we know atleast that our NEB is 'fine'
-        # It may have multiple minima but we can deal with that
-        
-        # exportForDebug(init,fin,neb,nebsCompleted)
-        
-        # Check if we have done this neb before.
-        # If not add it to completedNEBs list.
-        
         # pull image positions of neb and saddle index
         imagePos = [ x.get_positions().flatten() for x in neb.imagePositions ]
         saddleNode = neb.saddleNodes[0]
-
-        currentNEBPos = [ imagePos[neb.minimaNodes[0]], imagePos[ saddleNode ], imagePos[ neb.minimaNodes[-1] ] ]
+        currentNEBPos = [ imagePos[ neb.minimaNodes[0] ], 
+                         imagePos[ saddleNode ], 
+                         imagePos[ neb.minimaNodes[-1] ] 
+                        ]
         
+        # HACK: Gets us out of loops of doing the same nebs over and over which happens sometimes...
         seen = 0
         for seenNEBs in completedNEBPos:
             if maxMoveAtomPos(currentNEBPos[0] , seenNEBs[0], init.cellDims) < 0.1 and maxMoveAtomPos(currentNEBPos[1] , seenNEBs[1], init.cellDims ) < 0.1 and maxMoveAtomPos(currentNEBPos[2] , seenNEBs[2], init.cellDims ) < 0.1:
@@ -435,6 +428,7 @@ def main(initialState : State, finalState : State, params : InputParams, comm = 
         # Here we want to check if there are intermediate minima evident from the energy profile
         if len(neb.minimaNodes) > 2:
             if verbose: log(__name__, 'Found Intermediate Minima, Requeueing...')
+            
             nebsTODO_temp = []
             for i in range(len(neb.minimaNodes) - 1):
                 
@@ -444,15 +438,12 @@ def main(initialState : State, finalState : State, params : InputParams, comm = 
                 _init.pos = neb.imagePositions[ neb.minimaNodes[i] ].get_positions().flatten()
                 _fin.pos = neb.imagePositions[ neb.minimaNodes[i+1] ].get_positions().flatten()
 
-                # nebsTODO.append([_init, _fin])
                 nebsTODO_temp.append([_init, _fin])
             
             # update nebsTODO:
             nebsTODO = nebsTODO_temp + nebsTODO
-            continue
 
-        _init = None
-        _fin = None
+            continue
 
         # We go here if the energy profile looks 'normal' ....
         # If we get here then we know that we havent seen this NEB before...
@@ -463,12 +454,7 @@ def main(initialState : State, finalState : State, params : InputParams, comm = 
         lNodes = [ pos for p,pos in enumerate(imagePos) if p < saddleNode and p > 0 ]
         rNodes = [ pos for p,pos in enumerate(imagePos) if p > saddleNode and p < len(imagePos)-1 ]
 
-        # lTest = copy.deepcopy(init)
-        # lTest.pos = imagePos[0]
         lTest = init
-
-        # rTest = copy.deepcopy(init)
-        # rTest.pos = imagePos[-1]
         rTest = fin
         
         dummyState = copy.copy(init)
@@ -486,7 +472,6 @@ def main(initialState : State, finalState : State, params : InputParams, comm = 
                 continue
             else:
                 newMinimaPos.append(node)
-                # rTest.pos = node
                 requeueFlag = 1
                 break
 
@@ -494,19 +479,14 @@ def main(initialState : State, finalState : State, params : InputParams, comm = 
 
         if not requeueFlag:
             
-            # lTest = copy.deepcopy(init)
-            # lTest.pos = imagePos[0]
             lTest = init
-            # rTest = copy.deepcopy(init)
-            # rTest.pos = imagePos[-1]
             rTest = fin
-            # dummyState = copy.deepcopy(init)
+
             for n,node in enumerate(rNodes):
                 
                 # minimize in-place
-                # dummyState = copy.deepcopy(init)
                 dummyState.pos = node
-                lmp = LammpsInterface(params, communicator=comm)
+                lmp = LammpsInterface(params, communicator = comm)
                 lmp.minimize(dummyState, verbose = False)
                 del lmp
 
@@ -535,17 +515,20 @@ def main(initialState : State, finalState : State, params : InputParams, comm = 
                 _init.pos =  newMinimaPos[i]
                 _fin.pos = newMinimaPos[i+1]
 
-                # nebsTODO.append([_init, _fin])
                 nebsTODO_temp.append([_init, _fin])
                 
             # update nebsTODO:
             nebsTODO = nebsTODO_temp + nebsTODO
-        _init = None
-        _fin = None
         
         if not requeueFlag:
             
+            minDistInit = min.main(init, params, verbose = verbose)
+            minDistFin = min.main(fin, params, verbose = verbose)
+
             # store the structures and findings in a transition object
+            getStateCanonicalLabel(init, params, comm = comm)
+            getStateCanonicalLabel(fin, params, comm = comm)
+
             transition = Transition(init,fin)
             transition.forwardBarrier = neb.forwardBarrier
             transition.reverseBarrier = neb.reverseBarrier
@@ -556,25 +539,27 @@ def main(initialState : State, finalState : State, params : InputParams, comm = 
             sad = dummyState
             sad.pos = neb.imagePositions[ neb.saddleNodes[0] ].get_positions().flatten()
             transition.saddleState = sad
-            
-            # save the energies of the images on the path
-            transition.pathRelativeEnergies = list(neb.pathRelativeEnergy)
-            
-            # save images as states
-            transition.imagePositions = [ struc.get_positions().flatten() for struc in neb.imagePositions ]
+
+            for s, struc in enumerate(neb.imagePositions):
+                image = copy.deepcopy(init)
+                image.pos = struc.get_positions().flatten()
+                image.totalEnergy = neb.pathEnergy[s]
+                transition.images.append(image)
 
             # plot and export
-            if plotPathways: transition.plot(directory, nebSuccessful)
-            if exportStructures: transition.exportStructure(directory, nebSuccessful)
+            if plotPathways: transition.plot(directory, nebsSuccessful)
+            if exportStructures: transition.exportStructure(directory, nebsSuccessful)
 
             # summarize results
             if verbose: transition.printTransitionSummary()
 
+            # transition label
+            transition.label(params)
+
             # add this transition to the connection object
             connection.transitions.append(transition)
 
-            nebSuccessful += 1
-            transition = None
+            nebsSuccessful += 1
 
     return connection
 

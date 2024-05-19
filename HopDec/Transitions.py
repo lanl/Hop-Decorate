@@ -1,13 +1,9 @@
 import os
-import sys
 import random
 import copy
-import math
-import collections
 
 import numpy as np
 
-from . import Graphs
 from . import State
 from .Plots import *
 from .Input import *
@@ -15,37 +11,32 @@ from .Vectors import *
 from .State import *
 from .Utilities import *
 from .Constants import boltzmann
+from .Graphs import graphLabel
 
 class Transition:
     """
     Stores information about a single transition from a given state to another
     """
-    def __init__(self, initialState : State, finalState : State, index=None):
+    def __init__(self, initialState : State, finalState : State):
 
         self.initialState = initialState
         self.finalState = finalState
         self.saddleState = None
-
-        self.initialHash = initialState.canLabel
-        self.finalHash = finalState.canLabel
-
-        self.transitionHash = None
-        
-        self.redecorated = 0
-        
+                
         self.forwardBarrier = 0
         self.reverseBarrier = 0
         self.dE = 0
         self.KRA = 0
 
-        self.pathRelativeEnergies = []
-        self.imagePositions = []
+        self.images = [] # states
 
-        self.hash = None
-        self.index = index
+        self.canLabel = ''
+        self.nonCanLabel = ''
 
-    def calcRate(self, temperature : float, prefactor = 1e14) -> float:
-        return prefactor * np.exp( -self.forwardBarrier/ (temperature * boltzmann) )
+        self.redecoration = None
+
+    def calcRate(self, temperature : float, prefactor = 1e13) -> float:
+        return prefactor * np.exp( - self.forwardBarrier / (temperature * boltzmann) )
     
     def plot(self, folder : str, filename : str):
         
@@ -57,15 +48,21 @@ class Transition:
 
         """
 
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+
         f = f'{folder}/NEB_{filename}.png'
 
-        # log(__name__,f"Saving NEB Energy Pathway to '{f}'")
+        log(__name__,f"Saving NEB Energy Pathway to '{f}'")
 
+        ens = np.array([ image.totalEnergy for image in self.images ])
+        
         linePlot(f'{f}',
-                 xvals = [ i for i in range(len(self.pathRelativeEnergies)) ],
+                 xvals = [ i for i,_ in enumerate(self.images) ],
                  xlabel = 'NEB Node',
-                 yvals = self.pathRelativeEnergies,
-                 ylabel = 'Relative Energy (eV)')
+                 yvals = ens - np.min(ens),
+                 ylabel = 'Relative Energy (eV)',
+                 )
 
     def exportStructure(self, folder : str, subfolder : str) -> None:
 
@@ -76,20 +73,20 @@ class Transition:
             folder (str): The folder where the NEB structures will be exported.
 
         """
+
         folder = str(folder)
         subfolder = str(subfolder)
+
         if not os.path.exists(folder): 
             os.mkdir(folder)
         if not os.path.exists(f'{folder}/{subfolder}'):
             os.mkdir(f'{folder}/{subfolder}')
 
-        # log(__name__,f"Saving NEB Structure to '{folder}/{subfolder}'")
+        log(__name__,f"Saving NEB Structure to '{folder}/{subfolder}'")
 
-        for s,struc in enumerate(self.imagePositions):
-            tempState = copy.copy(self.initialState)
-            tempState.pos = struc
-            tempState.writeState(f'{folder}/{subfolder}/{s}.dat')
-            tempState = None
+        for i, image in enumerate(self.images):
+            image.writeState(f'{folder}/{subfolder}/{i}.dat')
+            
 
     def printTransitionSummary(self):
         """
@@ -111,6 +108,39 @@ class Transition:
             Reverse Energy Barrer: {self.reverseBarrier} eV, Rate at 1000 K: {self.calcRate(1000, self.reverseBarrier):e} 1/s
             KRA: {self.KRA} eV
             dE: {self.dE} eV ''')
+        
+    def label(self, params):
+
+        """
+        Get the hash value for a transition.
+
+        Args:
+            params: The input parameters.
+            initialState: The initial state for the transition.
+            finalState: The final state for the transition.
+
+        Returns:
+            str: The hash value for the transition.
+
+        """
+
+        initialState = self.initialState
+        finalState = self.finalState
+
+        dummyState = copy.deepcopy(initialState)
+        dummyState.NAtoms = int((len(initialState.defectPositions) + len(finalState.defectPositions)) // 3)
+        dummyState.defectPositions = np.concatenate((initialState.defectPositions, finalState.defectPositions))
+        dummyState.pos = np.concatenate((initialState.defectPositions, finalState.defectPositions))
+        defectTypes = np.concatenate((initialState.defectTypes, finalState.defectTypes))
+        defectIndices = np.concatenate((initialState.defectIndices, finalState.defectIndices))
+        
+    
+        graphEdges = findConnectivity(dummyState.defectPositions, params.bondCutoff, dummyState.cellDims)
+        
+        self.canLabel = graphLabel(graphEdges, types = defectTypes, canonical = 1)
+        self.nonCanLabel = graphLabel(graphEdges, indices = defectIndices, canonical = 0)
+
+        # dummyState.writeState(f'state/{self.canLabel}_{self.nonCanLabel}.dat')
 
 class Connection:
 
@@ -128,6 +158,7 @@ class Connection:
         return len(self.transitions)
 
     def printResults(self):
+
         """
         Display the results of the energy barriers and related values.
 
@@ -170,13 +201,14 @@ class Connection:
         for t,trans in enumerate(self.transitions):
             trans.exportStructure(folder,t)
             
-            
+
+
 
 class ASETransition:
     """
     Stores information about a single transition from a given state to another
     """
-    def __init__(self, initialState: Atoms, finalState: Atoms):
+    def __init__(self, initialState, finalState):
 
         self.initialState = initialState
         self.finalState = finalState
@@ -193,7 +225,7 @@ class ASEConnection:
 
     """ A connection is a collection of transitions which connect two or more states"""
     
-    def __init__(self, initialState : Atoms, finalState : Atoms):
+    def __init__(self, initialState, finalState):
         
         self.initialState = initialState
         self.finalState = finalState
@@ -223,5 +255,6 @@ def connectionToASE(connection: Connection, params: InputParams):
     
     return aseConn
     
+
 if __name__ == '__main__':
     pass

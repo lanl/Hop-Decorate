@@ -1,17 +1,9 @@
-from . import State as st
-from .Input import *
 from . import Atoms
-
-import numpy as np
-import tempfile
-from mpi4py import MPI
+from . import State
+from .Input import *
 
 import ase
-from ase.io import read, write
-from ase.calculators.lammpslib import LAMMPSlib
-from ase.optimize import MDMin
-from ase.neb import NEB
-from ase.optimize.fire import FIRE as QuasiNewton
+from mpi4py import MPI
 
 class ASE:
 
@@ -37,7 +29,7 @@ class ASE:
                         lmpcmds=(self.params.LAMMPSInitScript).split("\n"),
                         atom_types = self.atom_type_dict, 
                         keep_alive = True, 
-                        comm = self.comm
+                        # comm = self.comm
                         )
         
     def toState(self, aseAtoms : Atoms):
@@ -48,7 +40,7 @@ class ASE:
         NAtoms = len(pos)
         
         # initialize state object with NAtoms
-        state = st.State(NAtoms)
+        state = State.State(NAtoms)
 
         # add atomic positions to State and cell dimensions
         state.pos = pos.flatten()

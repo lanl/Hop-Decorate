@@ -1,13 +1,11 @@
-import tempfile
-import random
-import math
-import ctypes
-
 from .Utilities import *
 from .Vectors import *
 from .Utilities import log
 
 from lammps import lammps
+
+import random
+import ctypes
 
 class LammpsInterface:
     """
@@ -60,7 +58,7 @@ class LammpsInterface:
             self._lmp.close()
 
         # create a new instance
-        self._lmp = lammps(cmdargs=['-screen','none','-log','none'], comm = self.communicator)
+        self._lmp = lammps(cmdargs=['-screen','none','-log','none'])#, comm = self.communicator)
         # self._lmp = lammps(cmdargs=['-screen','none'], comm = self.communicator)
         # self._lmp = lammps()
 

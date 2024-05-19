@@ -1,4 +1,6 @@
 .DS_Store
 HopDec/.DS_Store
 HopDec/__pycache__/
-dependencies/lammps
+release-notes.md
+HopDec_Tutorial_02-21.pptx
+examples/loop/

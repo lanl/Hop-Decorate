@@ -67,8 +67,8 @@ pip install ase
 
 It is then recommended to add these lines to your .zshrc or .bashrc:  
 ```bash  
-export PATH=$PATH:/path/to/hopdecorate/  
-export PYTHONPATH=$PYTHONPATH:/path/to/hopdecorate/  
+export PATH=$PATH:/path/to/Hop-Decorate/  
+export PYTHONPATH=$PYTHONPATH:/path/to/Hop-Decorate/  
 ```
 
 ## Bug Reports and Discussions

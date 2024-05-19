@@ -1,17 +1,11 @@
-import ase
 from ase.io import read, write
 from ase.io import lammpsdata
 import ase.io.lammpsdata
 
-import random
-import tempfile
-from functools import partial
 import datetime
-import os
 import shutil
-import numpy as np
 import versioneer
-
+import numpy as np
 from typing import List, Union
 
 def writeTerminalBlock(message : str) -> None:
@@ -45,8 +39,9 @@ def writeTerminalBlock(message : str) -> None:
     print('')
 
 def printConsoleHeader():
-    version=versioneer.get_version()
-    writeTerminalBlock(f'Hop-Decorate ({version})')
+    # version=versioneer.get_version()
+    # writeTerminalBlock(f'Hop-Decorate ({version})')
+    writeTerminalBlock(f'Hop-Decorate')
 
 def printConsoleFooter():
     writeTerminalBlock(f'Fin.')

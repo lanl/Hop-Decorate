@@ -1,10 +1,7 @@
 import sys
-import os
 
 import numpy as np
 import xml.etree.ElementTree as ET
-
-from . import Utilities
 
 class InputParams:
     def __init__(self):
@@ -15,12 +12,14 @@ class InputParams:
         self.inputDirectory = ""
         self.inputFilename = ""
         self.verbose = 1
+        self.maxModelDepth = 0
+        self.canonicalLabelling = 0
+        self.checkpointInterval = 0
 
         # =====================================================================
         # Parameters for LAMMPS
         self.LAMMPSInitScript = ""
         self.MDTimestep = 0
-        self.CarveComputeScript = ""
         self.NSpecies = 0
         self.specieNames = None
         self.specieNamesString = ''
@@ -35,9 +34,12 @@ class InputParams:
         self.centroCutoff = 0.0
         self.eventDisplacement = 0
         self.bondCutoff = 0.0
+        self.nDefectsMax = 1
+        self.maxDefectAtoms = -1
 
         # =====================================================================
         # Parameters for Redecoration
+        self.redecorateTransitions = 0
         self.staticSpeciesString = ''
         self.staticSpecies = None
         self.staticSpeciesTypes = []
@@ -48,6 +50,7 @@ class InputParams:
         self.concentration = None
         self.nDecorations = 0
         self.randomSeed = 1234
+        self.pickleRedecorations = 0
 
         # =====================================================================
         # Parameters for LAMMPS Minimization
@@ -58,28 +61,21 @@ class InputParams:
 
         # =====================================================================
         # Parameters for NEB
+        self.breakSym = 0
         self.NEBNNodes = 0
         self.NEBClimbingImage = 0
         self.NEBSpringConstant = 0.0
         self.NEBForceTolerance = 0.0
         self.NEBTimestep = 0.0
         self.NEBMaxIterations = 0
-        self.NEBmaxBarrier = 0.0
-        self.NEBCheckIntermediateMinima = 0
-        self.maxNEBsToDo = 0
+        self.NEBmaxBarrier = np.inf
+        self.maxNEBsToDo = np.inf
 
         # =====================================================================
         # Parameters for DIMER
         self.DIMERForceTol = 0.0
         self.DIMERMaxSteps = 0
         self.initialDIMERDisplacementDistance = 0
-
-        # =====================================================================
-        # Parameters for TAD
-        self.lowTADTemp = 300
-        self.TADMaxBarriers = 0
-        self.maxKMCSteps = 10
-
 
 def getParams(inputParamFile="HopDec-config.xml"):
     """
