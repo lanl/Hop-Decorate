@@ -2,13 +2,36 @@
 
 <!--
 ===================================
-LAMMPS SETTINGS
+MAIN SETTINGS
 ===================================
 -->
 
 <!-- initial configuration  -->
-<inputFilename>input/IV1.dat</inputFilename>
+<inputFilename>_</inputFilename>
 <inputDirectory>input/</inputDirectory>
+
+<!-- 0(False)/1(True) for verbose output -->
+<verbose> 1 </verbose>
+
+<!-- controls how much we should grow the model. -1 = no limit, 0 = only run MD in initial state. -->
+<!-- No other values are currently implemented. -->
+<maxModelDepth> -1 </maxModelDepth>
+
+<!-- step intervals of checkpoint files -->
+<checkpointInterval> 100 </checkpointInterval>
+
+<!-- 1 = use canonical labelling for model growth, 0 = opposite -->
+<canonicalLabelling> 1 </canonicalLabelling>
+
+<!-- Redecorate discovered transition? 0 = No, 1 = Yes -->
+<!-- Redecoration settings can be found below -->
+<redecorateTransitions> 1 </redecorateTransitions>
+
+<!--
+===================================
+LAMMPS SETTINGS
+===================================
+-->
 
 <!-- Boilerplate lammps script. 
 If working with a charged system use the 'set' command in this block -->
@@ -42,7 +65,7 @@ DEFECT IDENTIFICATION SETTINGS
 -->
 
 <!-- Centrosymmetry N nearest neighbor setting -->
-<centroN>8</centroN>
+<centroN>12</centroN>
 <!-- Centrosymmetry cutoff for defect volume identification -->
 <centroCutoff>1</centroCutoff>
 <!-- Maximum distance between two atoms (overestimate slightly) -->
@@ -66,6 +89,8 @@ REDECORATION SETTINGS
 <!-- Integer random seed for the redecoration process. -->
 <!-- WARNING: Redecorations will be identical if this value is unchanged-->
 <randomSeed>1234</randomSeed>
+<!-- do you want to pickle the redecoration info straight to file? 0 = No, 1 = Yes -->
+<pickleRedecorations> 0 </pickleRedecorations>
 
 <!--
 ===================================
@@ -88,6 +113,12 @@ NEB SETTINGS
 ===================================
 -->
 
+<!-- break symmetry with a few steps of MD before a NEB simulation is run -->
+<!-- sometimes the neb can be initialized with a highly symmetric linear interpolation
+this can give strange NEB results where two (uncorrelated) atoms move at the same time. 
+If you experience this then turn this setting ON (1)-->
+<breakSym>1</breakSym>
+
 <!-- NEB knots -->
 <NEBNodes> 11 </NEBNodes>
 <NEBClimbingImage>0</NEBClimbingImage>
@@ -99,9 +130,6 @@ NEB SETTINGS
 <NEBMaxIterations> 100 </NEBMaxIterations>
 <!-- <NEBTimestep> 0.002 </NEBTimestep> -->
 <NEBmaxBarrier>100</NEBmaxBarrier>
-<!-- Check for intermediate minimia in NEB calculation. -->
-<NEBCheckIntermediateMinima> 0 </NEBCheckIntermediateMinima>
-<maxNEBsToDo>100</maxNEBsToDo>
 
 <!--
 ===================================

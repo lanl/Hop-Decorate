@@ -116,7 +116,7 @@ NEB SETTINGS
 <!-- sometimes the neb can be initialized with a highly symmetric linear interpolation
 this can give strange NEB results where two (uncorrelated) atoms move at the same time. 
 If you experience this then turn this setting ON (1)-->
-<breakSym></breakSym>
+<breakSym>1</breakSym>
 
 <!-- NEB knots -->
 <NEBNodes> 11 </NEBNodes>
