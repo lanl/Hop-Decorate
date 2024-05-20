@@ -62,6 +62,8 @@ class State:
 
         self.totalEnergy = None
         self.time = 0
+        self.doWork = 0
+        self.depth = 0
 
         self.centroSyms = []
         self.defectCOM = []

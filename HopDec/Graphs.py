@@ -52,3 +52,18 @@ def nDefectVolumes(graphEdges):
         return 1
     else:
         return 2
+    
+def buildNetwork(nodes,edges):
+
+    G = nx.Graph()
+
+    G.add_nodes_from(nodes)
+    G.add_edges_from(edges)
+
+    return G
+
+def shortestPath(graph, source, target):
+
+    if source not in graph.nodes or target not in graph.nodes: return np.inf
+    else: return len(nx.shortest_path(graph, source = source, target = target)) - 1
+    

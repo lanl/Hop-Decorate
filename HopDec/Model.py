@@ -4,6 +4,7 @@ from . import Minimize
 
 import pickle
 from typing import List
+import networkx as nx
 
 class Model:
         
@@ -38,16 +39,29 @@ class Model:
         self.params = params
         self.initState = None
 
+        self.graph = None
+
         self.stateList = [] # Contains the state objects
         self.transitionList = [] # Contains the transition Objects
         self.canLabelList = []
+        self.stateWorkCheck = np.array([]) # 0 = do work, 1 = dont do work
 
     def __len__(self):
         return len(self.transitionList)
-   
-    def update(self, workDistribution = [], states = [], transitions = [], connections = []):
+    
+    def buildModelGraph(self):
 
-        ''' want this function to handle both of the above cases for model updating'''
+        edges = [ ( trans.initialState.nonCanLabel, trans.finalState.nonCanLabel ) 
+                    for trans in self.transitionList ]
+        
+        nodes = [ state.nonCanLabel for state in self.stateList ]
+
+        self.graph = buildNetwork(nodes, edges)
+
+    def findDepth(self, state):        
+        return shortestPath(self.graph, self.initState.nonCanLabel, state.nonCanLabel)
+        
+    def update(self, workDistribution = [], states = [], transitions = [], connections = []):
 
         def cleanData(data):
             return [ x for x in data if x is not None ]
@@ -60,6 +74,13 @@ class Model:
 
                     log(__name__,'Added New State to Model')
                     self.stateList.append(state)
+
+                    self.buildModelGraph()
+                    if self.findDepth(state) <= self.params.maxModelDepth or self.params.maxModelDepth < 0: 
+                        state.doWork = 1
+                    else:
+                        state.doWork = 0
+
                     state.time = self.params.segmentLength
                     foundNew = 1
                 else:
@@ -85,36 +106,51 @@ class Model:
                     updateStates([transition.initialState, transition.finalState])
 
                 else:
-                    # TODO: - this isnt appropriate if the defect seperated
+                    # TODO: - this message isnt appropriate if the defect seperated
                     log(__name__, 'Previously Seen Transition')
 
             return foundNew
-
+        
         # clean the data. it may have NONEs        
         states = cleanData(states)
         transitions = cleanData(transitions)
         connections = cleanData(connections)
 
+        # update MD time in each state where MD was done.
         for state in workDistribution: state.time += self.params.segmentLength
 
+        # generally not used during 'HopDec-main' functionality
         foundNewState = updateStates(states)
         foundNewTrans = updateTransitions(transitions)
 
-        # -1 means no limit so we add everything.
+        # When updating the model during 'HopDec-main' 
+        # we are usually given a Connection object which is handled below.
+
+        # -1 means no limit so we attempt to add every transition to the model.
         if self.params.maxModelDepth < 0:
             foundNewConn = updateTransitions([ trans for connection in connections for trans in connection.transitions ])
         
-        # TODO: account for different model depth requirements.
-        # currently we just add transitions which have an initialState at the starting point.
+        # otherwise we need to check state depths.
         else:
-            toAdd = []
-            for connection in connections:
-                for trans in connection.transitions:
-                    # TODO: this should probably be done by comparing labels.
-                    if maxMoveAtom(trans.initialState, self.initState) < 0.1: 
-                        toAdd.append(trans)
 
-            foundNewConn = updateTransitions(transitions = toAdd)
+            toAdd = []
+            foundNewConn = 0
+
+            for connection in connections:
+
+                self.buildModelGraph()
+
+                for t,trans in enumerate(connection.transitions):
+
+                    if self.findDepth(trans.initialState) <= self.params.maxModelDepth:
+
+                    # if currentDepth <= self.params.maxModelDepth: # if the initial state is one in which we would like to search                
+
+                        # toAdd.append(trans)
+                        test = updateTransitions(transitions = [trans])
+                        foundNewConn = max(foundNewConn,test)
+
+            # foundNewConn = updateTransitions(transitions = toAdd)
 
         return max(foundNewState, foundNewConn, foundNewTrans)
 
@@ -147,9 +183,11 @@ class Model:
         return l
     
     def workDistribution(self, size):
+
         inverseTimes = 1 / np.array([ s.time for s in self.stateList ])
-        # TODO: account for different model depth requirements.
-        if self.params.maxModelDepth >= 0: inverseTimes[1:] = 0
+        workArray = np.array([ s.doWork for s in self.stateList ])
+        inverseTimes = inverseTimes * workArray
+
         return np.random.choice(self.stateList, p = inverseTimes  / inverseTimes .sum(), size = size)
 
 def checkpoint(model, filename = 'model-checkpoint_latest.pkl'):
@@ -168,7 +206,6 @@ def setupModel(params, comm = None) -> Model:
     if params.verbose: log(__name__, f"Reading state file: {params.inputFilename}",0)
     model.initState = readStateLAMMPSData(params.inputFilename)
 
-    # mininize State 'in-place'
     Minimize.main(model.initState, params, comm = comm)
     
     model.update(states = [model.initState])

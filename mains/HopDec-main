@@ -12,9 +12,7 @@ import pickle
 
 def main(baseComm, params):
 
-    # TODO: - Need to update config files with new options
-    #       - maxModelDepth parameter could be used to control how many transitions away from initial we want to run MD.
-    #       - Need a way to test if the transition has been seen before BEFORE doing the NEB. This is hard because the ranks own the transitions but not the model...
+    # TODO:  - Need a way to test if the transition has been seen before BEFORE doing the NEB. This is hard because the ranks own the transitions but not the model...
 
     from mpi4py import MPI
 
@@ -26,6 +24,8 @@ def main(baseComm, params):
 
     baseComm.barrier()
     
+    model = None
+
     if rank == 0: 
         
         printConsoleHeader()
@@ -37,8 +37,6 @@ def main(baseComm, params):
         else:
             # setup a model if we aren't given one.
             model = setupModel(params, comm = comm)
-    
-    else: model = None # only rank 0 gets a model
 
     k = 0
     while True: ###### if modelGrowth = 0 then the criteria should just be based on initialState
@@ -76,19 +74,15 @@ def main(baseComm, params):
             for r in range(1,size):
                 baseComm.send(workDistribution[r], dest = r, tag = 0)
 
-        else:
+        else: initialState = baseComm.recv(source = 0, tag = 0)
 
-            initialState = baseComm.recv(source = 0, tag = 0)
-
-        initialState = copy.deepcopy(initialState)
-       
         # run the MD for 'params.segmentLength' ps at 'params.MDTemperature' K
+        initialState = copy.deepcopy(initialState)
         _, finalState, flag = MD.main(initialState, params, comm = comm, maxMDTime = params.segmentLength, rank = rank, verbose = True)
     
         # if we hopped, run a neb to generate a connection
         connection = None
         if flag:
-            # stop here if the init and fin violate the maz defect thing???
             log('NEB', f'rank: {rank} Running NEB', 0)
             connection = NEB.main(initialState, finalState, params, comm = comm)
 
@@ -102,7 +96,6 @@ def main(baseComm, params):
 
             # if the model was updated
             if status:
-
                 # write checkpoint files
                 checkpoint(model)
                 checkpoint(model, filename = f'model-checkpoint_{len(model)}.pkl')
@@ -113,9 +106,7 @@ def main(baseComm, params):
 
         baseComm.barrier()
     
-    if rank == 0: 
-        
-        printConsoleFooter()
+    if rank == 0: printConsoleFooter()
 
     # clean up
     MPI.Finalize()

@@ -13,8 +13,8 @@ MAIN SETTINGS
 <!-- 0(False)/1(True) for verbose output -->
 <verbose> 1 </verbose>
 
-<!-- controls how much we should grow the model. -1 = no limit, 0 = only run MD in initial state. -->
-<!-- No other values are currently implemented. -->
+<!-- controls how much we should grow the model. -1 = no limit, 0 = only run MD in initial state. 
+1= run MD in states one transition away from initialState, ...etc -->
 <maxModelDepth> 0 </maxModelDepth>
 
 <!-- step intervals of checkpoint files -->
