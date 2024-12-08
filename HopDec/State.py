@@ -360,6 +360,36 @@ class State:
 
         return atoms
     
+def atomsInSphere(state : State, center : List[float], radius : float):
+
+    '''
+    Return all atoms and their types that are inside a sphere with periodic boundaries.
+    
+    state: State object that includes positions of atoms and box size.
+    center: The center of the sphere [x, y, z].
+    radius: The radius of the sphere.
+    
+    Returns:
+    - List of indices of atoms inside the sphere.
+    '''
+    
+    positions = np.array(state.pos).reshape(-1, 3)  # Reshape positions to Nx3
+    center = np.array(center)  # Convert center to NumPy array
+    box_size = np.array([ state.cellDims[0], state.cellDims[4], state.cellDims[8]])  # The size of the periodic box (assumed to be a 3D box)
+    
+    # Compute minimum distances taking into account periodic boundaries
+    distances = np.linalg.norm(
+        (positions - center) - np.round((positions - center) / box_size) * box_size, axis=1
+    )
+    
+    # Get the indices where the distance is within the radius
+    indices = np.where(distances <= radius)[0]
+    
+    # Convert indices to the x-coordinate indices in the original flat list
+    x_indices = (indices * 3).tolist()
+    
+    return x_indices
+    
     
 def readStateLAMMPSData(filename: str)-> State:
 
