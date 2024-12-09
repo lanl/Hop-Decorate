@@ -196,6 +196,7 @@ def findConnectivity(pos, cutoff, cellDims):
     Returns:
     - list: A list of connected point pairs.
     """
+    
     # Extract the periodic box dimensions from the 3x3 cellDims matrix if needed
     box_dims = np.array([cellDims[0], cellDims[4], cellDims[8]])
     

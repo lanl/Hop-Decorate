@@ -1,12 +1,7 @@
 from ase.io import read, write
-from ase.io import lammpsdata
-import ase.io.lammpsdata
 
 import datetime
-import shutil
-import versioneer
-import numpy as np
-from typing import List, Union
+from typing import List
 
 def writeTerminalBlock(message : str) -> None:
     
@@ -75,112 +70,6 @@ def log(caller: str, message: str, indent: int = 0) -> None:
         pass
 
     print(f"[{now}]: {ind}{caller} >> {message}", flush = True)
-
-
-def ORlC(filePath: str, popNo: int = 0) -> List[List[str]]:
-    """
-    Opens a file, reads the lines, pops any from the top that you don't want, and returns those lines as an array.
-
-    The function reads the content of the file specified by 'filePath' and returns its lines as a list of lists.
-    Each sublist represents a line from the file, and the resulting list will exclude the first 'popNo' lines if specified.
-
-    Parameters:
-        filePath (str): The path to the file that needs to be opened.
-        popNo (int, optional): The number of lines to remove from the top. Defaults to 0.
-
-    Returns:
-        List[List[str]]: A list of lists containing the lines of the file.
-            Each sublist represents a line from the file.
-
-    Raises:
-        FileNotFoundError: If the specified file is not found.
-        ValueError: If 'popNo' is negative.
-    """
-
-    if popNo < 0:
-        raise ValueError("The 'popNo' parameter must be a non-negative integer.")
-
-    try:
-        with open(filePath, 'r') as f:
-            lines = f.readlines()
-            return [lines[i:] for i in range(popNo, len(lines))]
-    except FileNotFoundError:
-        raise FileNotFoundError(f"File not found: '{filePath}'")
-
-    return lines
-
-def Extract(lst: List[List[Union[int, float, str]]], i: int) -> List[Union[int, float, str]]:
-    """
-    Extracts the i-th element from each sublist in a list of lists.
-
-    Given a list of lists 'lst' and a non-negative integer 'i', this function extracts
-    the i-th element from each sublist and returns a new list containing these elements.
-
-    Parameters:
-        lst (List[List[Union[int, float, str]]]): A list of lists (NxM array) where M > 1.
-            Each sublist can contain elements of type int, float, or str.
-        i (int): The index (i-th element) to extract from each sublist.
-
-    Returns:
-        List[Union[int, float, str]]: A new list containing the i-th element from each sublist.
-            The order of elements in the returned list corresponds to the order of sublists in 'lst'.
-
-    Raises:
-        ValueError: If 'i' is negative or if the input list 'lst' is empty.
-    """
-    if i < 0:
-        raise ValueError("The index 'i' must be a non-negative integer.")
-
-    if not lst:
-        raise ValueError("The input list 'lst' must not be empty.")
-
-    return [item[i] for item in lst]
-
-def del_from_arrays(list_of_arrays: List[np.ndarray], index: int) -> List[np.ndarray]:
-    """
-    Deletes the element at the specified index from each array in the list.
-
-    Parameters:
-        list_of_arrays (List[np.ndarray]): A list of NumPy arrays.
-        index (int): The index of the element to delete from each array.
-
-    Returns:
-        List[np.ndarray]: A new list of NumPy arrays with the specified element removed from each array.
-
-    Raises:
-        ValueError: If the index is out of range for any of the arrays.
-    """
-
-    # Input validation: Check if the index is within the valid range for the arrays
-    array_shapes = [array.shape[0] for array in list_of_arrays]
-    if index < 0 or any(index >= shape for shape in array_shapes):
-        raise ValueError("Index is out of range for one or more arrays.")
-
-    return [np.delete(array, index, axis=0) for array in list_of_arrays]
-
-def copy_file(source_path: str, destination_path: str):
-    """
-    Copies a file from the source path to the destination path using the shutil.copy function.
-
-    Parameters:
-        source_path (str): The path of the file to be copied.
-        destination_path (str): The path where the file will be copied.
-
-    Raises:
-        FileNotFoundError: If the source file is not found.
-        Exception: If any other unexpected error occurs during copying.
-
-    Returns:
-        int: Always returns 0 after the copy operation is completed or an error is encountered.
-    """
-    try:
-        shutil.copy(source_path, destination_path)
-        print(f"File '{source_path}' successfully copied to '{destination_path}'.")
-    except FileNotFoundError:
-        print(f"Error: File '{source_path}' not found.")
-    except Exception as e:
-        print(f"An error occurred while copying the file: {e}")
-
 
 def writeLAMMPSDataFile(filename : str, NAtoms : int, NSpecies: int, cellDims : List[float], types : List[int], positions : List[float]):
         """
