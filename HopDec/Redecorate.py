@@ -5,7 +5,7 @@ from .State import *
 from .NEB import *
 from .Plots import *
 from .Vectors import *
-from . import NEB as nb
+from . import NEB as neb
 
 import numpy as np
 import pandas as pd
@@ -18,32 +18,35 @@ class Redecorate:
     def __init__(self, params: InputParams):
 
         self.params = params
-        self.outPath = ''
 
         self.connections = []
         self.aseConnections = []
-        self.transHash = None
 
     def __len__(self):
         return len(self.aseConnections)
 
     def buildShuffleLists(self, state):
 
-        initialTypeList = [-1 if ty not in self.params.staticSpeciesTypes else ty for ty in state.type]
-        count = initialTypeList.count(-1)
-    
-        # now we build the list which we want to shuffle.
+        state_type = np.array(state.type)
+
+        # Initialize initialTypeList with -1 for types not in staticSpeciesTypes
+        initialTypeList = np.where(np.isin(state_type, self.params.staticSpeciesTypes), state_type, -1)
+        count = np.sum(initialTypeList == -1)
+
+        # Compute nAtEach array, which will hold the number of active species for each type
         nAtEach = count * np.array(self.params.concentration)
 
-        shuffleList = [self.params.activeSpeciesTypes[n] 
-                       for n, nAt in enumerate(nAtEach) 
-                       for _ in range(int(nAt))
-                       ]
-        
-        while len(shuffleList) < count:
-            shuffleList.append(self.params.activeSpeciesTypes[0]) # just puts more of the first element in...
+        # Create the shuffle list
+        shuffleList = np.array([self.params.activeSpeciesTypes[n] 
+                                for n, nAt in enumerate(nAtEach) 
+                                for _ in range(int(nAt))
+                                ])
 
-        return initialTypeList, shuffleList
+        # If the shuffle list is shorter than the count, append more of the first element
+        if len(shuffleList) < count:
+            shuffleList = np.concatenate([shuffleList, np.repeat(self.params.activeSpeciesTypes[0], count - len(shuffleList))])
+
+        return initialTypeList.tolist(), shuffleList.tolist()
 
     def run(self, initialState: State, finalState: State, comm = None):
         
@@ -76,7 +79,7 @@ class Redecorate:
             shuffleListCurrent = copy.deepcopy(shuffleList)
             init = copy.deepcopy(initialState)
             fin = copy.deepcopy(finalState)
-            initL = copy.deepcopy(initialTypeList)
+            decoration = copy.deepcopy(initialTypeList)
 
             log(__name__, f"rank: {rank}: Redecoration: {n+1}",1)        
 
@@ -86,28 +89,23 @@ class Redecorate:
             
             # recombine with static types
             j = 0
-            for i in range(len(initL)):
-                if initL[i] == -1:
-                    initL[i] = shuffleListCurrent[j]
+            for i in range(len(decoration)):
+                if decoration[i] == -1:
+                    decoration[i] = shuffleListCurrent[j]
                     j += 1
 
             # apply the atom type list to initial and final states.
-            init.type = initL
-            fin.type = initL
+            init.type = decoration
+            fin.type = decoration
             init.NSpecies = self.params.NSpecies
             fin.NSpecies = self.params.NSpecies
 
             # run a NEB
-            connection = nb.main(init, fin, self.params, comm = newComm)
+            connection = neb.main(init, fin, self.params, comm = newComm)
 
             if len(connection):
                 self.connections.append(connection)
-                
-            init = None
-            fin = None
-            initL = None
-            connection = None
-
+            
         # need to gather with ase structure objects.
         # gathering with State objects caused Seg Fault         
         self.aseConnections = [ connectionToASE(conn, self.params) for conn in self.connections ]
@@ -115,7 +113,6 @@ class Redecorate:
             connectionList = comm.gather(self.aseConnections, root = 0)
             if rank == 0:
                 self.aseConnections = [item for sublist in connectionList for item in sublist]
-
         
             comm.barrier()
             
