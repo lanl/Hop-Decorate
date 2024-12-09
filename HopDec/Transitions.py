@@ -131,11 +131,11 @@ class Transition:
         dummyState.NAtoms = int((len(initialState.defectPositions) + len(finalState.defectPositions)) // 3)
         dummyState.defectPositions = np.concatenate((initialState.defectPositions, finalState.defectPositions))
         dummyState.pos = np.concatenate((initialState.defectPositions, finalState.defectPositions))
+
         defectTypes = np.concatenate((initialState.defectTypes, finalState.defectTypes))
         defectIndices = np.concatenate((initialState.defectIndices, finalState.defectIndices))
         
-    
-        graphEdges = findConnectivity(dummyState.defectPositions, params.bondCutoff, dummyState.cellDims)
+        graphEdges = findConnectivity(dummyState.pos, params.bondCutoff, dummyState.cellDims)
         
         self.canLabel = graphLabel(graphEdges, types = defectTypes, canonical = 1)
         self.nonCanLabel = graphLabel(graphEdges, indices = defectIndices, canonical = 0)
