@@ -221,7 +221,7 @@ class LammpsInterface:
         # measure the max that an atom has moved
         maxSep = 0
         for i in range(state.NAtoms):
-            maxSep = np.max([ maxSep, separation( [ self.startPos[3*i], self.startPos[3*i+1], self.startPos[3*i+2]], [ state.pos[3*i], state.pos[3*i+1], state.pos[3*i+2]] , state.cellDims) ])
+            maxSep = np.max([ maxSep, distance( [ self.startPos[3*i], self.startPos[3*i+1], self.startPos[3*i+2]], [ state.pos[3*i], state.pos[3*i+1], state.pos[3*i+2]] , state.cellDims) ])
         
         return maxSep
     

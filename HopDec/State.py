@@ -127,7 +127,7 @@ class State:
             for inPos in inputPos:
                 for index in range(self.NAtoms):
                     pos = [ self.pos[3*index], self.pos[3*index+1], self.pos[3*index+2] ]
-                    if Vectors.separation(pos,inPos,cellDims) < maxSep:
+                    if Vectors.distance(pos,inPos,cellDims) < maxSep:
                         indices = np.append(indices,index)
                 
         return indices
@@ -234,7 +234,7 @@ class State:
             for i,atomid in enumerate(atomList):
                 test_pos = [ self.pos[3*atomid], self.pos[3*atomid+1], self.pos[3*atomid+2] ]
                 
-                sep = separation(inputPos,test_pos,self.cellDims)
+                sep = distance(inputPos,test_pos,self.cellDims)
                 if  sep < minSep:
                     minSep = sep
                     minSepIndex = i
@@ -270,7 +270,7 @@ class State:
         """
         if index1 < self.NAtoms and index2 < self.NAtoms:
             pass
-            atomSeparation = Vectors.separation(self.atomPos(index1), self.atomPos(index2), self.cellDims)
+            atomSeparation = Vectors.distance(self.atomPos(index1), self.atomPos(index2), self.cellDims)
         else:
             raise IndexError(f"Atom index(es) out of range: ({index1} or {index2}) >= {self.NAtoms}")
 
