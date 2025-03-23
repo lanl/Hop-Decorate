@@ -63,7 +63,10 @@ def buildNetwork(nodes,edges):
     return G
 
 def shortestPath(graph, source, target):
-
-    if source not in graph.nodes or target not in graph.nodes: return np.inf
-    else: return len(nx.shortest_path(graph, source = source, target = target)) - 1
-    
+    if source not in graph.nodes or target not in graph.nodes: 
+        return np.inf
+    try:
+        path_length = len(nx.shortest_path(graph, source=source, target=target)) - 1
+        return path_length
+    except nx.NetworkXNoPath:
+        return np.inf
