@@ -10,7 +10,7 @@ from . import NEB as neb
 import numpy as np
 import pandas as pd
 import random
-import pickle
+import pickle as pkl
 import copy
 
 class Redecorate:
@@ -21,6 +21,8 @@ class Redecorate:
 
         self.connections = []
         self.aseConnections = []
+
+        self.filename = ''
 
     def __len__(self):
         return len(self.aseConnections)
@@ -103,52 +105,63 @@ class Redecorate:
             # run a NEB
             connection = neb.main(init, fin, self.params, comm = newComm)
 
+            # if it was successful update decoration list
             if len(connection):
-                self.connections.append(connection)
-            
-        # need to gather with ase structure objects.
-        # gathering with State objects caused Seg Fault         
-        self.aseConnections = [ connectionToASE(conn, self.params) for conn in self.connections ]
-        if comm:           
-            connectionList = comm.gather(self.aseConnections, root = 0)
-            if rank == 0:
-                self.aseConnections = [item for sublist in connectionList for item in sublist]
+                
+                # trim connections
+                for trans in connection.transitions:
+                    trans.images = []
+                    trans.saddleState = None
+                
+                self.connections.append(connection)   
         
+        if comm:
             comm.barrier()
+            connectionList = comm.gather(self.connections, root = 0)
+            if rank == 0:
+                self.connections = [item for sublist in connectionList for item in sublist]
             
         return 0
             
-    def pickleIt(self, filename = 'test'):
+    def toDisk(self, params : InputParams, filename = 'test'):
         
-        # Write data to pandas
-        df = pd.DataFrame(columns = ['initialState', 
-                                     'finalState', 
-                                     'KRA', 
-                                     'dE', 
-                                     'initialState_Energy',
-                                     'finalState_Energy',
-                                     ])
+        # Prepare an empty list to accumulate rows
+        rows = []
 
-        # changes structure to ase
-        for d,decoration in enumerate(self.aseConnections):
-
+        # Loop through the connections and transitions
+        for d,decoration in enumerate(self.connections):
             for t,transition in enumerate(decoration.transitions):
 
-                row = pd.DataFrame.from_dict({'initialState'        : [transition.initialState],
-                                              'finalState'          : [transition.finalState],
-                                              'KRA'                 : [transition.KRA],
-                                              'dE'                  : [transition.dE],
-                                              'initialState_Energy' : [transition.initialState_energy], 
-                                              'finalState_Energy'   : [transition.finalState_energy],
-                                              })
-                
-                df = pd.concat([df,row], ignore_index=True)
+                # Create a dictionary for the row data
+                row = {
+                    'Composition': params.concentrationString,
+                    'Decoration': d + 1,
+                    'Transition': t + 1,
+                    'Initial State': transition.initialState,
+                    'Final State': transition.finalState,
+                    'Forward Barrier': transition.forwardBarrier,
+                    'Reverse Barrier': transition.reverseBarrier,
+                    'KRA': transition.KRA,
+                    'dE': transition.dE,
+                    'Init Can Label' : transition.initialState.canLabel,
+                    'Init non-Can Label' : transition.initialState.nonCanLabel,
+                    'Fin Can Label' : transition.finalState.canLabel,
+                    'Fin non-Can Label' : transition.finalState.nonCanLabel,
+                    'Trans Can Label' : transition.canLabel,
+                    'Trans non-Can Label' : transition.nonCanLabel,   
+                    'Initial Energy': transition.initialState.totalEnergy,
+                    'Final Energy': transition.finalState.totalEnergy
+                }
+
+                # Append the row dictionary to the list
+                rows.append(row)
+
+        # Convert the list of rows into a pandas DataFrame at the end
+        df = pd.DataFrame(rows)
 
         # Pickle the DataFrame
         with open(f'{filename}', 'wb') as f:
-
-            pickle.dump(df, f)
-            
+            pkl.dump(df, f)
             
     def summarize(self):
         """
@@ -206,11 +219,11 @@ def mainCMD(comm):
 
     transition = Transition(initialState, finalState)
 
-    Red = main(transition, params , comm = comm, pickle = True)
+    Red = main(transition, params , comm = comm)
 
     Red.summarize()
 
-def main(obj, params : InputParams, pickle = True, comm = None):
+def main(obj, params : InputParams, comm = None):
     
     rank = 0
     if comm: rank = comm.Get_rank()
@@ -223,16 +236,17 @@ def main(obj, params : InputParams, pickle = True, comm = None):
     
         # run the redecoration method
         Red.run(obj.initialState, obj.finalState, comm = comm)
-        obj.redecorated = 1
+
+        # record it
+        obj.label(params)
         
-        # pickle it?
-        if pickle and not rank: 
-            obj.label(params)
-            Red.pickleIt(filename = f'{obj.canLabel}_{obj.nonCanLabel}.pkl')
-    
+        filename = f'./{obj.canLabel}_{obj.nonCanLabel}'
+        obj.redecoration = filename
+        if rank == 0: Red.toDisk(params, filename = f'{filename}.pkl')
+
     else:
         raise TypeError("obj must be an instance of Transition")
 
     if comm: comm.barrier()
 
-    return Red
+    return filename

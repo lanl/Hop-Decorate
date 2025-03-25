@@ -3,6 +3,8 @@ import random
 import copy
 
 import numpy as np
+import pickle as pkl
+import pandas as pd
 
 from . import State
 from .Plots import *
@@ -34,6 +36,18 @@ class Transition:
         self.nonCanLabel = ''
 
         self.redecoration = None
+        self.redecorated = 0
+
+    def loadRedecoration(self):
+        ''' Method to load in the redecoration refered to in self.redecoration '''
+        filename = f'{self.redecoration}.pkl'
+        if os.path.exists(filename):
+            with open(filename,'rb') as f:
+                df = pkl.load(f)
+            return df
+        else:
+            print("WARNING: Redecoration for this transition does not exist")
+            return pd.DataFrame()
 
     def calcRate(self, temperature : float, prefactor = 1e13) -> float:
         return prefactor * np.exp( - self.forwardBarrier / (temperature * boltzmann) )

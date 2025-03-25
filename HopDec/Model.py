@@ -2,7 +2,7 @@ from .Transitions import *
 from .State import *
 from . import Minimize
 
-import pickle
+import pickle as pkl
 from typing import List
 import networkx as nx
 
@@ -45,9 +45,21 @@ class Model:
         self.transitionList = [] # Contains the transition Objects
         self.canLabelList = []
         self.stateWorkCheck = np.array([]) # 0 = do work, 1 = dont do work
+        
 
     def __len__(self):
         return len(self.transitionList)
+    
+    def loadRedecorations(self):
+        # TODO: Add logging
+        self.redecorations = []
+        for trans in self.transitionList:
+            df = trans.loadRedecoration()
+
+        if df.empty:
+            self.redecorations.append(None)
+        else:
+            self.redecorations.append(df)
     
     def buildModelGraph(self):
 
@@ -72,16 +84,23 @@ class Model:
                 
                 if self.checkUniqueness(state):
 
-                    log(__name__,'Added New State to Model')
                     self.stateList.append(state)
-
                     self.buildModelGraph()
-                    if self.findDepth(state) <= self.params.maxModelDepth or self.params.maxModelDepth < 0: 
+                    depth = self.findDepth(state)
+
+                    # This is a catch for if we find a state but cant resolve a transition to it.
+                    if depth == np.inf:
+                      print('WARNING: Found State with no valid Transition. Skipping...')
+                      _ = self.stateList.pop(-1)
+                      continue
+
+                    if depth <= self.params.maxModelDepth or self.params.maxModelDepth < 0: 
                         state.doWork = 1
                     else:
                         state.doWork = 0
 
                     state.time = self.params.segmentLength
+                    log(__name__,'Added New State to Model')
                     foundNew = 1
                 else:
                     log(__name__, 'Previously Seen State.')
@@ -120,8 +139,8 @@ class Model:
         for state in workDistribution: state.time += self.params.segmentLength
 
         # generally not used during 'HopDec-main' functionality
-        foundNewState = updateStates(states)
         foundNewTrans = updateTransitions(transitions)
+        foundNewState = updateStates(states)
 
         # When updating the model during 'HopDec-main' 
         # we are usually given a Connection object which is handled below.
@@ -175,12 +194,6 @@ class Model:
                 return 0
             else:
                 return 1
-        
-    def undecoratedTransitions(self):
-        l = []
-        for transition in self.transitionList:
-            if not transition.redecoration: l.append(transition)
-        return l
     
     def workDistribution(self, size):
 
@@ -192,7 +205,7 @@ class Model:
 
 def checkpoint(model, filename = 'model-checkpoint_latest.pkl'):
     with open(filename, 'wb') as f:
-        pickle.dump(model, f)
+        pkl.dump(model, f, protocol=4)
     
 def setupModel(params, comm = None) -> Model:
     

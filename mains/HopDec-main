@@ -8,7 +8,7 @@ import HopDec.Redecorate as Redecorate
 import HopDec.NEB as NEB
 import HopDec.MD as MD
 
-import pickle
+import pickle as pkl
 
 def main(baseComm, params):
 
@@ -33,7 +33,7 @@ def main(baseComm, params):
         # load/initalize the model
         if os.path.exists('model-checkpoint_latest.pkl'):
             with open('model-checkpoint_latest.pkl', 'rb') as f:
-                model = pickle.load(f)
+                model = pkl.load(f)
         else:
             # setup a model if we aren't given one.
             model = setupModel(params, comm = comm)
@@ -43,25 +43,25 @@ def main(baseComm, params):
 
         if params.redecorateTransitions:
             
-            _undecoratedTransitions = None
-            if rank == 0: 
-                undecoratedTransitions = model.undecoratedTransitions()
-                _undecoratedTransitions = copy.deepcopy(undecoratedTransitions)
+            transitions = []
+            if rank == 0: transitions = model.transitionList
 
-            _undecoratedTransitions = baseComm.bcast(_undecoratedTransitions, root = 0)
-
-            for t,trans in enumerate(_undecoratedTransitions):
+            transitions = baseComm.bcast(transitions, root = 0)
+            
+            for t,trans in enumerate(transitions):
+                if not trans.redecoration:
                 
-                # run redecoration
-                redecResults = Redecorate.main(trans, params, pickle = params.pickleRedecorations, comm = baseComm)
-                
-                if rank == 0: 
-                    # update model
-                    undecoratedTransitions[t].redecoration = redecResults
+                    # run redecoration
+                    filename = Redecorate.main(trans, params, comm = baseComm)
 
-                    # write checkpoint file
-                    checkpoint(model)
-                    checkpoint(model, filename = f'model-checkpoint_{len(model)}.pkl')
+                    if rank == 0:
+                        
+                        # update model
+                        model.transitionList[t].redecoration = filename
+
+                        # write checkpoint file
+                        checkpoint(model)
+                        checkpoint(model, filename = f'model-checkpoint_{len(model)}.pkl')
 
         baseComm.barrier()
 

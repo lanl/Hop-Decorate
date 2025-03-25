@@ -50,7 +50,6 @@ class InputParams:
         self.concentration = None
         self.nDecorations = 0
         self.randomSeed = 1234
-        self.pickleRedecorations = 0
 
         # =====================================================================
         # Parameters for LAMMPS Minimization

@@ -102,8 +102,6 @@ REDECORATION SETTINGS
 <!-- Integer random seed for the redecoration process. -->
 <!-- WARNING: Redecorations will be identical if this value is unchanged-->
 <randomSeed>1234</randomSeed>
-<!-- do you want to pickle the redecoration info straight to file? 0 = No, 1 = Yes -->
-<pickleRedecorations> 0 </pickleRedecorations>
 
 <!--
 ===================================

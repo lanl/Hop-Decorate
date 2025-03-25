@@ -84,12 +84,10 @@ REDECORATION SETTINGS
 <!-- Comma seperated list of concentrations, Order must be the same as in specieNamesString -->
 <concentrationString>0.5,0.5</concentrationString>
 <!-- Number of decorations to do for each transition -->
-<nDecorations> 8 </nDecorations>
+<nDecorations> 4 </nDecorations>
 <!-- Integer random seed for the redecoration process. -->
 <!-- WARNING: Redecorations will be identical if this value is unchanged-->
 <randomSeed>1234</randomSeed>
-<!-- do you want to pickle the redecoration info straight to file? 0 = No, 1 = Yes -->
-<pickleRedecorations> 0 </pickleRedecorations>
 
 <!--
 ===================================
