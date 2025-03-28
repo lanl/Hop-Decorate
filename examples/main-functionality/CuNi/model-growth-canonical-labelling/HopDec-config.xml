@@ -23,6 +23,9 @@ MAIN SETTINGS
 <!-- 1 = use canonical labelling for model growth, 0 = opposite -->
 <canonicalLabelling> 1 </canonicalLabelling>
 
+<!-- Discover new transitions? 0 = No, 1 = Yes -->
+<modelSearch> 1 </modelSearch>
+
 <!-- Redecorate discovered transition? 0 = No, 1 = Yes -->
 <!-- Redecoration settings can be found below -->
 <redecorateTransitions> 1 </redecorateTransitions>
@@ -84,7 +87,7 @@ REDECORATION SETTINGS
 <!-- Comma seperated list of concentrations, Order must be the same as in specieNamesString -->
 <concentrationString>0.5,0.5</concentrationString>
 <!-- Number of decorations to do for each transition -->
-<nDecorations> 4 </nDecorations>
+<nDecorations> 8 </nDecorations>
 <!-- Integer random seed for the redecoration process. -->
 <!-- WARNING: Redecorations will be identical if this value is unchanged-->
 <randomSeed>1234</randomSeed>
@@ -114,17 +117,17 @@ NEB SETTINGS
 <!-- sometimes the neb can be initialized with a highly symmetric linear interpolation
 this can give strange NEB results where two (uncorrelated) atoms move at the same time. 
 If you experience this then turn this setting ON (1)-->
-<breakSym>1</breakSym>
+<breakSym>0</breakSym>
 
 <!-- NEB knots -->
 <NEBNodes> 11 </NEBNodes>
 <NEBClimbingImage> 0 </NEBClimbingImage>
 <!-- NEB spring constant, in [F]/[X] MD units  -->
-<NEBSpringConstant> 1 </NEBSpringConstant> 
+<NEBSpringConstant> 0.1 </NEBSpringConstant> 
 <!-- Maximum element of force vector in MD units -->
-<NEBForceTolerance> 0.01 </NEBForceTolerance>
+<NEBForceTolerance> 0.1 </NEBForceTolerance>
 <!-- Maximum number of force calls -->
-<NEBMaxIterations> 1000 </NEBMaxIterations>
+<NEBMaxIterations> 100 </NEBMaxIterations>
 
 <!--
 ===================================

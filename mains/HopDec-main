@@ -8,51 +8,59 @@ import HopDec.Redecorate as Redecorate
 import HopDec.NEB as NEB
 import HopDec.MD as MD
 
-import pickle as pkl
+def main(baseComm):
 
-def main(baseComm, params):
-
-    # TODO:  - Need a way to test if the transition has been seen before BEFORE doing the NEB. This is hard because the ranks own the transitions but not the model...
+    # TODO:  - Need a way to test if the transition has been seen before BEFORE doing the NEB. 
+    #          This is hard because the ranks own the transitions but not the model...
 
     from mpi4py import MPI
 
     ### Comm Setup ###
     rank = baseComm.Get_rank()
     size = baseComm.Get_size()
-    color = rank
-    comm = baseComm.Split(color = color, key = rank)
+    comm = baseComm.Split(color = rank, key = rank)
 
     baseComm.barrier()
+
+    params = getParams()
     
     model = None
-
     if rank == 0: 
-        
+
         printConsoleHeader()
 
-        # load/initalize the model
-        if os.path.exists('model-checkpoint_latest.pkl'):
-            with open('model-checkpoint_latest.pkl', 'rb') as f:
+        # load or init model
+        filename = 'model-checkpoint_latest.pkl'
+        if os.path.exists(filename):
+            with open(filename, 'rb') as f:
                 model = pkl.load(f)
         else:
             # setup a model if we aren't given one.
             model = setupModel(params, comm = comm)
-
+        
     k = 0
-    while True: ###### if modelGrowth = 0 then the criteria should just be based on initialState
+    redecorate = params.redecorateTransitions
+    search = params.modelSearch
 
-        if params.redecorateTransitions:
+    while redecorate or search:
+
+        # if we are needing/wanting to run redecorate campaign
+        if redecorate:
             
+            # tell all ranks about known transitions
             transitions = []
-            if rank == 0: transitions = model.transitionList
-
+            if rank == 0: 
+                transitions = model.transitionList
             transitions = baseComm.bcast(transitions, root = 0)
             
+            # loop over our transitions and find those that havent been redecorate
             for t,trans in enumerate(transitions):
                 if not trans.redecoration:
                 
                     # run redecoration
-                    filename = Redecorate.main(trans, params, comm = baseComm)
+                    filename = Redecorate.main(trans, 
+                                               params, 
+                                               comm = baseComm)
 
                     if rank == 0:
                         
@@ -63,75 +71,89 @@ def main(baseComm, params):
                         checkpoint(model)
                         checkpoint(model, filename = f'model-checkpoint_{len(model)}.pkl')
 
-        baseComm.barrier()
-
-        # generate list of states that need more MD.
-        # if we dont want to grow the model then model.intialState is the only choice
-        if rank == 0:
-
-            workDistribution = model.workDistribution(size)
-            initialState = workDistribution[0]
-            for r in range(1,size):
-                baseComm.send(workDistribution[r], dest = r, tag = 0)
-
-        else: initialState = baseComm.recv(source = 0, tag = 0)
-
-        # run the MD for 'params.segmentLength' ps at 'params.MDTemperature' K
-        initialState = copy.deepcopy(initialState)
-        _, finalState, flag = MD.main(initialState, params, comm = comm, maxMDTime = params.segmentLength, rank = rank, verbose = True)
-    
-        # if we hopped, run a neb to generate a connection
-        connection = None
-        if flag:
-            log('NEB', f'rank: {rank} Running NEB', 0)
-            connection = NEB.main(initialState, finalState, params, comm = comm)
-
-        # gather all connections to rank 0
-        connections = baseComm.gather(connection, root = 0)
-        
-        if rank == 0:         
-        
-            # update model on rank 0 with connections from each rank
-            status = model.update(workDistribution, connections = connections)
-
-            # if the model was updated
-            if status:
-                # write checkpoint files
-                checkpoint(model)
-                checkpoint(model, filename = f'model-checkpoint_{len(model)}.pkl')
-
-            k += 1
-            if k % params.checkpointInterval == 0:
-                checkpoint(model)
+            # turn redec off when we're done
+            redecorate = 0
 
         baseComm.barrier()
-    
-    if rank == 0: printConsoleFooter()
 
-    # clean up
+        if search:
+
+            # generate list of states that need more MD and send that to all ranks
+            if rank == 0:
+                workDistribution = model.workDistribution(size)
+                initialState = workDistribution[0]
+
+                for r in range(1,size):
+                    baseComm.send(workDistribution[r], 
+                                  dest = r, 
+                                  tag = 0)
+            else: 
+                initialState = baseComm.recv(source = 0, 
+                                               tag = 0)
+
+            # run the MD for 'params.segmentLength' ps at 'params.MDTemperature' K
+            initialState = copy.deepcopy(initialState)
+            _, finalState, flag = MD.main(initialState, 
+                                          params, 
+                                          comm = comm, 
+                                          maxMDTime = params.segmentLength, 
+                                          rank = rank, 
+                                          verbose = True)
+        
+            # if we hopped, run a neb to generate a connection
+            connection = None
+            if flag:
+                log('NEB', f'rank: {rank} Running NEB', 0)
+                connection = NEB.main(initialState, 
+                                      finalState, 
+                                      params, 
+                                      comm = comm)
+
+            # gather all connections to rank 0
+            connections = baseComm.gather(connection, root=0)
+            
+            if rank == 0:
+            
+                # update model on rank 0 with connections from each rank
+                status = model.update(workDistribution,
+                                      connections = connections)
+
+                # if the model was updated
+                if status:
+
+                    # write checkpoint files
+                    checkpoint(model)
+                    checkpoint(model, filename = f'model-checkpoint_{len(model)}.pkl')
+
+                    # if we found something new and we want to redecorate then turn that back on for next loop
+                    if params.redecorateTransitions: redecorate = 1
+
+                k += 1
+                if k % params.checkpointInterval == 0:
+                    checkpoint(model)
+
+                # TODO: Some condition for switching off search based on user's params
+                # min time in each state for stopping
+                minTime = np.min([ state.time for state in model.stateList ])
+                if minTime > np.inf: # params.minTimeCutoff
+                    search = 0
+
+            # broadcast to everybody
+            search = baseComm.bcast(search, root=0)
+            redecorate = baseComm.bcast(redecorate, root=0)
+
+        baseComm.barrier()
+
+    # clean-up
+    if rank == 0: 
+        checkpoint(model)
+        checkpoint(model, filename = f'model-checkpoint_{len(model)}.pkl')
+        log('Model','All work finished')
+        printConsoleFooter()
+
     MPI.Finalize()
 
 if __name__== "__main__":
-
-    import signal
-    import sys
-
-    def handler(signum, frame):
-        print("Time limit exceeded. Exiting...")
-        # run some clean-up script here...
-        sys.exit()
     
-    comm = MPI.COMM_WORLD
-    params = getParams()
-
-    # Set up a timer to trigger after params.runTime (seconds)
-    signal.signal(signal.SIGALRM, handler)
-    signal.alarm(params.runTime)
-
-    try:
-        main(comm, params)
-        
-    finally:
-        # Reset the alarm to avoid the handler being called after the script completes
-        signal.alarm(0)
-    
+    comm = MPI.COMM_WORLD 
+    main(comm)

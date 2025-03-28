@@ -23,6 +23,9 @@ MAIN SETTINGS
 <!-- 1 = use canonical labelling for model growth, 0 = opposite -->
 <canonicalLabelling> 0 </canonicalLabelling>
 
+<!-- Discover new transitions? 0 = No, 1 = Yes -->
+<modelSearch> 1 </modelSearch>
+
 <!-- Redecorate discovered transition? 0 = No, 1 = Yes -->
 <!-- Redecoration settings can be found below -->
 <redecorateTransitions> 1 </redecorateTransitions>

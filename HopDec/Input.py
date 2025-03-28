@@ -15,6 +15,8 @@ class InputParams:
         self.maxModelDepth = 0
         self.canonicalLabelling = 0
         self.checkpointInterval = 0
+        self.redecorateTransitions = 0
+        self.modelSearch = 0
 
         # =====================================================================
         # Parameters for LAMMPS
@@ -39,7 +41,6 @@ class InputParams:
 
         # =====================================================================
         # Parameters for Redecoration
-        self.redecorateTransitions = 0
         self.staticSpeciesString = ''
         self.staticSpecies = None
         self.staticSpeciesTypes = []
