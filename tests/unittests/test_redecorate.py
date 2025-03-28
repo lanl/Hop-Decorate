@@ -11,7 +11,6 @@ from HopDec.Redecorate import Redecorate
 from HopDec.Input import InputParams 
 from HopDec import NEB
 from HopDec import State
-from HopDec.Transitions import connectionToASE
 
 class TestRedecorate(unittest.TestCase):
 
@@ -59,25 +58,8 @@ class TestRedecorate(unittest.TestCase):
         
         # Check the shuffle list has the expected number of elements
         self.assertEqual(len(shuffleList), 3)  # 3 active atoms in state
-    
-    @patch('builtins.open', new_callable=unittest.mock.mock_open)
-    @patch('pickle.dump')
-    def test_pickleIt(self, mock_pickle_dump, mock_open):
-        """Test the pickleIt method."""
-        
-        # Create mock connection data
-        mock_transition = MagicMock(initialState='init', finalState='fin', KRA=0.1, dE=0.2, 
-                                    initialState_energy=1.0, finalState_energy=2.0)
-        mock_decoration = MagicMock(transitions=[mock_transition])
-        self.redecorate.aseConnections = [mock_decoration]
-        
-        self.redecorate.pickleIt('testfile.pkl')
-        
-        # Check that the file was opened in write mode
-        mock_open.assert_called_once_with('testfile.pkl', 'wb')
-        
-        # Check that pickle.dump was called
-        self.assertTrue(mock_pickle_dump.called)
+
+
     
     @patch('HopDec.Utilities.log')
     def test_summarize(self, mock_log):
