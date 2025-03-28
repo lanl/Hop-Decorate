@@ -120,7 +120,6 @@ class Redecorate:
             connectionList = comm.gather(self.connections, root = 0)
             if rank == 0:
                 self.connections = [item for sublist in connectionList for item in sublist]
-            
         return 0
             
     def toDisk(self, params : InputParams, filename = 'test'):
@@ -219,9 +218,9 @@ def mainCMD(comm):
 
     transition = Transition(initialState, finalState)
 
-    Red = main(transition, params , comm = comm)
+    filename = main(transition, params , comm = comm)
 
-    Red.summarize()
+    log('Redecoration',f'Done. Redecoration results: {filename}')
 
 def main(obj, params : InputParams, comm = None):
     
