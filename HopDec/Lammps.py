@@ -164,7 +164,7 @@ class LammpsInterface:
             T = params.MDTemperature
 
         self._lmp.commands_string(f"""
-        velocity all create {0.5*T} {random.randint(0, 999999)}
+        velocity all create {2*T} {random.randint(0, 999999)}
         fix LANG all langevin {T} {T} 0.1 {random.randint(0, 999999)} gjf no
         fix NVE all nve
         fix COM all recenter INIT INIT INIT
