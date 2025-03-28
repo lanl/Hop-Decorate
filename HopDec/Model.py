@@ -56,10 +56,10 @@ class Model:
         for trans in self.transitionList:
             df = trans.loadRedecoration()
 
-        if df.empty:
-            self.redecorations.append(None)
-        else:
-            self.redecorations.append(df)
+            if df.empty:
+                self.redecorations.append(None)
+            else:
+                self.redecorations.append(copy.copy(df))
     
     def buildModelGraph(self):
 
