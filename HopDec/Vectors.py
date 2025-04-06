@@ -116,7 +116,7 @@ def maxMoveAtom(s1, s2) -> float:
     distances = np.linalg.norm(displacements, axis=1)
     
     # Return the maximum displacement
-    return np.max(distances)
+    return np.max(distances), np.argmax(distances)
 
 def maxMoveAtomPos(pos1: list, pos2: list, cellDims: list) -> float:
     """
