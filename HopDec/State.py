@@ -234,7 +234,7 @@ class State:
             for i,atomid in enumerate(atomList):
                 test_pos = [ self.pos[3*atomid], self.pos[3*atomid+1], self.pos[3*atomid+2] ]
                 
-                sep = distance(inputPos,test_pos,self.cellDims)
+                sep = Vectors.distance(inputPos,test_pos,self.cellDims)
                 if  sep < minSep:
                     minSep = sep
                     minSepIndex = i
