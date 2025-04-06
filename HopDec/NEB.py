@@ -361,7 +361,7 @@ def main(initialState : State, finalState : State, params : InputParams, comm = 
             continue
 
         # if the initial structure has hyperdistance within some cutoff we say they are the same structure
-        if maxMoveAtom(init, fin) < uniquenessThreshold:
+        if maxMoveAtom(init, fin)[0] < uniquenessThreshold:
             if verbose: log(__name__,f"WARNING. Initial and Final Structures are the Same. Skipping...")
             continue
 
@@ -466,9 +466,9 @@ def main(initialState : State, finalState : State, params : InputParams, comm = 
             lmp.minimize(dummyState, verbose = False)
             del lmp
 
-            if maxMoveAtom(lTest, dummyState) < 0.1:
+            if maxMoveAtom(lTest, dummyState)[0] < 0.1:
                 break
-            elif maxMoveAtom(rTest, dummyState) < 0.1:
+            elif maxMoveAtom(rTest, dummyState)[0] < 0.1:
                 continue
             else:
                 newMinimaPos.append(node)
@@ -490,9 +490,9 @@ def main(initialState : State, finalState : State, params : InputParams, comm = 
                 lmp.minimize(dummyState, verbose = False)
                 del lmp
 
-                if maxMoveAtom(rTest, dummyState) < 0.1:
+                if maxMoveAtom(rTest, dummyState)[0] < 0.1:
                     break
-                elif maxMoveAtom(lTest, dummyState) < 0.1:
+                elif maxMoveAtom(lTest, dummyState)[0] < 0.1:
                     continue
                 else:
                     newMinimaPos.append(node)
