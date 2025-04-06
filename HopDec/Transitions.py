@@ -14,6 +14,7 @@ from .State import *
 from .Utilities import *
 from .Constants import boltzmann
 from .Graphs import graphLabel
+import HopDec.Vectors as vec
 
 class Transition:
     """
@@ -37,6 +38,11 @@ class Transition:
 
         self.redecoration = None
         self.redecorated = 0
+
+    def maxMoveAtom(self):
+        _, index = vec.maxMoveAtom(self.initialState, self.finalState)
+        type = self.initialState.type[index]
+        return index, type
 
     def loadRedecoration(self):
         ''' Method to load in the redecoration refered to in self.redecoration '''
