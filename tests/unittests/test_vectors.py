@@ -79,7 +79,7 @@ class TestVectors(unittest.TestCase):
         s1 = MockState(pos1, cellDims, 2)
         s2 = MockState(pos2, cellDims, 2)
         
-        max_move = maxMoveAtom(s1, s2)
+        max_move = maxMoveAtom(s1, s2)[0]
         self.assertAlmostEqual(max_move, np.sqrt(27), places=5)
     
     def test_maxMoveAtomPos(self):
